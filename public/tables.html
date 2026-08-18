@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Denah Meja Restoran</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f4f6f9; padding: 20px; }
+    
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
+    .btn-back { background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+
+    /* Ringkasan Legend Status */
+    .legend { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 25px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+    .dot-available { background: #28a745; }
+    .dot-occupied { background: #dc3545; }
+    .dot-ready { background: #17a2b8; }
+
+    /* Grid Layout Meja */
+    .tables-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
+    
+    /* Card Meja */
+    .table-card { background: white; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-top: 8px solid #28a745; transition: transform 0.2s; position: relative; }
+    .table-card:hover { transform: translateY(-3px); }
+    
+    .table-number { font-size: 22px; font-weight: bold; color: #2d3748; margin-bottom: 5px; }
+    .table-status { font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 20px; display: inline-block; margin-bottom: 12px; }
+    
+    .bg-available { background: #e8f5e9; color: #2e7d32; }
+    .bg-occupied { background: #ffebee; color: #c62828; }
+    .bg-ready { background: #e0f7fa; color: #00838f; }
+
+    .table-card.status-occupied { border-top-color: #dc3545; }
+    .table-card.status-ready { border-top-color: #17a2b8; }
+
+    .order-info { font-size: 13px; color: #555; text-align: left; background: #f8f9fa; padding: 8px; border-radius: 6px; margin-bottom: 10px; }
+    .btn-move { background: #ffc107; color: #000; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px; width: 100%; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>🪑 Denah & Status Meja Restoran</h1>
+    <a href="/dashboard.html" class="btn-back">← Kembali ke Dashboard</a>
+  </div>
+
+  <!-- Legend Indikator Status -->
+  <div class="legend">
+    <div class="legend-item"><span class="dot dot-available"></span> Meja Kosong</div>
+    <div class="legend-item"><span class="dot dot-occupied"></span> Terisi / Diproses</div>
+    <div class="legend-item"><span class="dot dot-ready"></span> Makanan Siap Disajikan</div>
+  </div>
+
+  <!-- Grid Denah Meja -->
+  <div class="tables-grid" id="tables-container"></div>
+
+  <script>
+    const socket = io();
+    let masterTables = [];
+    let currentOrders = [];
+
+    // Ambil daftar meja dari server
+    fetch('/api/tables')
+      .then(res => res.json())
+      .then(data => {
+        masterTables = data;
+        renderTables();
+      });
+
+    socket.on('initial-orders', (orders) => {
+      currentOrders = orders;
+      renderTables();
+    });
+
+    socket.on('order-updated', (orders) => {
+      currentOrders = orders;
+      renderTables();
+    });
+
+    function renderTables() {
+      const container = document.getElementById('tables-container');
+      if (!container || masterTables.length === 0) return;
+
+      container.innerHTML = '';
+
+      masterTables.forEach(table => {
+        // Cari apakah ada pesanan aktif di meja ini
+        const activeOrder = currentOrders.find(o => o.table === table.id && o.status !== 'CLOSED');
+
+        let statusClass = 'available';
+        let statusText = 'KOSONG';
+        let infoHTML = '<p style="color:#888; font-size:12px; margin: 15px 0;">Siap menerima tamu</p>';
+        let actionBtn = '';
+
+        if (activeOrder) {
+          if (activeOrder.status === 'READY') {
+            statusClass = 'ready';
+            statusText = 'SIAP SERVE';
+          } else {
+            statusClass = 'occupied';
+            statusText = 'TERISI';
+          }
+
+          infoHTML = `
+            <div class="order-info">
+              <strong>Atas Nama:</strong> ${activeOrder.id}<br>
+              <strong>Total Bill:</strong> Rp ${activeOrder.total.toLocaleString('id-ID')}<br>
+              <strong>Item:</strong> ${activeOrder.items.length} porsi
+            </div>
+          `;
+
+          actionBtn = `<button class="btn-move" onclick="moveTablePrompt('${table.id}')">🔄 Pindah Meja</button>`;
+        }
+
+        container.innerHTML += `
+          <div class="table-card status-${statusClass}">
+            <div class="table-number">${table.name}</div>
+            <span class="table-status bg-${statusClass}">${statusText}</span>
+            ${infoHTML}
+            ${actionBtn}
+          </div>
+        `;
+      });
+    }
+
+    // Fungsi Pindah Meja
+    function moveTablePrompt(oldTableNo) {
+      const targetTableNo = prompt(`Pindahkan pemesan dari MEJA ${oldTableNo} ke Meja Nomor Berapa?`);
+      
+      if (targetTableNo) {
+        const targetExist = masterTables.find(t => t.id === targetTableNo.trim());
+        if (!targetExist) {
+          return alert('Nomor meja tujuan tidak ditemukan!');
+        }
+
+        const isOccupied = currentOrders.some(o => o.table === targetTableNo.trim() && o.status !== 'CLOSED');
+        if (isOccupied) {
+          return alert(`Meja ${targetTableNo} sedang terisi! Pilih meja yang masih kosong.`);
+        }
+
+        socket.emit('move-table', { oldTable: oldTableNo, newTable: targetTableNo.trim() });
+        alert(`Berhasil memindahkan pesanan dari Meja ${oldTableNo} ke Meja ${targetTableNo}!`);
+      }
+    }
+  </script>
+</body>
+</html>

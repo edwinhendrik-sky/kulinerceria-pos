@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Kitchen Display System (Makanan)</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #1e1e1e; color: white; margin: 0; }
+    
+    .header-kitchen { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 2px solid #333; 
+      padding-bottom: 15px; 
+      margin-bottom: 20px; 
+    }
+    .header-kitchen h1 { margin: 0; font-size: 24px; color: #fff; }
+    
+    .btn-nav { 
+      background: #6c757d; 
+      color: white; 
+      padding: 8px 16px; 
+      border-radius: 6px; 
+      text-decoration: none; 
+      font-weight: bold; 
+      margin-right: 10px; 
+      display: inline-block;
+    }
+    
+    .btn-logout { 
+      background: #dc3545; 
+      color: white; 
+      border: none; 
+      padding: 8px 16px; 
+      border-radius: 6px; 
+      font-weight: bold; 
+      cursor: pointer; 
+    }
+    .btn-logout:hover { background: #c82333; }
+
+    .kds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
+    .kds-card { background: #2d2d2d; padding: 15px; border-radius: 8px; border-top: 6px solid #e74c3c; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    .kds-card h2 { margin-top: 0; font-size: 20px; color: #e74c3c; border-bottom: 1px solid #444; padding-bottom: 8px; }
+    .kds-item-list { list-style: none; padding: 0; margin: 15px 0; }
+    .kds-item-list li { padding: 8px 0; border-bottom: 1px solid #3d3d3d; display: flex; align-items: center; font-size: 18px; font-weight: bold; }
+    .kds-item-list input[type="checkbox"] { margin-right: 12px; transform: scale(1.4); cursor: pointer; }
+    .item-done { text-decoration: line-through; color: #6c757d; }
+    .btn-done { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header Layar Dapur -->
+  <div class="header-kitchen">
+    <h1>🍳 Layar Dapur (Khusus Makanan)</h1>
+    <div>
+      <a href="/dashboard.html" id="btn-back-dash" class="btn-nav" style="display:none;">← Dashboard</a>
+      <button type="button" class="btn-logout" onclick="handleLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="kds-grid" id="kds-container"></div>
+
+  <script>
+    // 1. Fungsi Logout Global
+    function handleLogout() {
+      if (confirm('Keluar dari layar dapur?')) {
+        localStorage.clear();
+        window.location.href = '/login.html';
+      }
+    }
+
+    // 2. Cek Autentikasi Session
+    const userRole = localStorage.getItem('userRole');
+    if (!userRole) {
+      window.location.href = '/login.html';
+    } else if (userRole === 'ADMIN' || userRole === 'KASIR') {
+      document.getElementById('btn-back-dash').style.display = 'inline-block';
+    }
+
+    // 3. Socket.io Logic
+    const socket = io();
+
+    socket.on('initial-orders', renderKDS);
+    socket.on('order-updated', renderKDS);
+
+    function renderKDS(orders) {
+      const container = document.getElementById('kds-container');
+      container.innerHTML = '';
+
+      const kitchenOrders = orders.filter(o => o.status === 'COOKING');
+
+      let hasItems = false;
+
+      kitchenOrders.forEach(order => {
+        const foodItems = order.items.filter(i => i.category === 'kitchen');
+
+        if (foodItems.length > 0) {
+          hasItems = true;
+          let itemsHTML = '';
+          foodItems.forEach((item, index) => {
+            itemsHTML += `
+              <li>
+                <input type="checkbox" id="kds-check-${order.id}-${index}" onchange="toggleCheck(this)">
+                <label for="kds-check-${order.id}-${index}">${item.name}</label>
+              </li>`;
+          });
+
+          container.innerHTML += `
+            <div class="kds-card">
+              <h2>MEJA ${order.table} - ${order.id}</h2>
+              <p style="font-size: 12px; color: #aaa;">Masuk: ${order.createdAt}</p>
+              <ul class="kds-item-list">${itemsHTML}</ul>
+              <button class="btn-done" onclick="finishKitchen('${order.id}')">Selesai Masak</button>
+            </div>
+          `;
+        }
+      });
+
+      if (!hasItems) {
+        container.innerHTML = '<p style="color: #888; font-size: 18px;">Belum ada pesanan makanan.</p>';
+      }
+    }
+
+    function toggleCheck(checkbox) {
+      const label = checkbox.nextElementSibling;
+      checkbox.checked ? label.classList.add('item-done') : label.classList.remove('item-done');
+    }
+
+    function finishKitchen(orderId) {
+      socket.emit('update-status', { orderId, status: 'READY' });
+    }
+  </script>
+</body>
+</html>

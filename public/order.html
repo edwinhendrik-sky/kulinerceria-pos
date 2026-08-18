@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buku Menu Digital</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f8f9fa; padding-bottom: 90px; }
+
+    /* Header */
+    .header { background: #d32f2f; color: white; padding: 15px 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .header h2 { font-size: 20px; }
+    .header p { font-size: 13px; opacity: 0.9; }
+
+    .container { padding: 15px; max-width: 600px; margin: 0 auto; }
+
+    /* Customer Form */
+    .card-input { background: white; padding: 15px; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .card-input label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #333; }
+    .card-input input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; outline: none; }
+
+    /* Section Title */
+    .section-title { font-size: 16px; font-weight: bold; margin: 15px 0 10px; color: #444; border-left: 4px solid #d32f2f; padding-left: 8px; }
+
+    /* Menu Grid Cards */
+    .menu-card { background: white; border-radius: 12px; overflow: hidden; margin-bottom: 12px; display: flex; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+    .menu-img { width: 100px; height: 100px; object-fit: cover; }
+    .menu-info { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+    .menu-name { font-weight: bold; font-size: 15px; color: #222; }
+    .menu-price { color: #d32f2f; font-weight: bold; font-size: 14px; margin-top: 4px; }
+
+    /* Qty Counter Buttons */
+    .qty-control { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+    .btn-qty { background: #eee; border: none; width: 32px; height: 32px; border-radius: 50%; font-weight: bold; font-size: 18px; cursor: pointer; color: #333; display: flex; align-items: center; justify-content: center; }
+    .btn-qty.plus { background: #d32f2f; color: white; }
+    .btn-qty:active { transform: scale(0.95); }
+    .qty-count { font-weight: bold; font-size: 15px; width: 20px; text-align: center; }
+
+    /* Floating Cart Bottom Bar */
+    .cart-bar { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 12px 20px; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 -4px 10px rgba(0,0,0,0.08); max-width: 600px; margin: 0 auto; }
+    .total-info small { color: #777; font-size: 11px; }
+    .total-info div { font-size: 18px; font-weight: bold; color: #d32f2f; }
+    .btn-order { background: #2e7d32; color: white; border: none; padding: 12px 24px; border-radius: 25px; font-weight: bold; font-size: 15px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2>🍽️ Rumah Makan Enak</h2>
+    <p>Meja Nomor: <strong id="table-number">1</strong></p>
+  </div>
+
+  <div class="container">
+    <!-- Input Nama -->
+    <div class="card-input">
+      <label for="customer-name">Nama Pemesan:</label>
+      <input type="text" id="customer-name" placeholder="Ketik nama Anda di sini..." required>
+    </div>
+
+    <!-- Makanan -->
+    <div class="section-title">Makanan</div>
+    <div id="kitchen-menu-list"></div>
+
+    <!-- Minuman -->
+    <div class="section-title">Minuman</div>
+    <div id="bar-menu-list"></div>
+  </div>
+
+  <!-- Bottom Floating Order Bar -->
+  <div class="cart-bar">
+    <div class="total-info">
+      <small id="item-count">0 Item Dipilih</small>
+      <div id="total-price">Rp 0</div>
+    </div>
+    <button class="btn-order" onclick="sendOrder()">Kirim Pesanan</button>
+  </div>
+
+  <script>
+    const socket = io();
+    const urlParams = new URLSearchParams(window.location.search);
+    const tableNo = urlParams.get('table') || '1';
+    document.getElementById('table-number').innerText = tableNo;
+
+    let cartState = {}; // Menyimpan Qty item { id: count }
+    let menuData = [];
+
+    // Fetch Data Menu dari Server
+    function fetchMenu() {
+      fetch('/api/menu')
+        .then(res => res.json())
+        .then(data => {
+          menuData = data;
+          renderMenuList();
+        })
+        .catch(err => console.error("Gagal mengambil data menu:", err));
+    }
+
+    fetchMenu();
+
+    function renderMenuList() {
+      const kitchenContainer = document.getElementById('kitchen-menu-list');
+      const barContainer = document.getElementById('bar-menu-list');
+      
+      kitchenContainer.innerHTML = '';
+      barContainer.innerHTML = '';
+
+      menuData.forEach(item => {
+        const qty = cartState[item.id] || 0;
+        
+        // Pengecekan ketersediaan stok
+        const isAvailable = item.isAvailable !== false && (item.stock === undefined || item.stock > 0);
+
+        const cardHTML = `
+          <div class="menu-card" style="${!isAvailable ? 'opacity:0.6; background:#f0f0f0;' : ''}">
+            <img src="${item.image}" class="menu-img" alt="${item.name}">
+            <div class="menu-info">
+              <div>
+                <div class="menu-name">${item.name}</div>
+                <div class="menu-price">Rp ${item.price.toLocaleString('id-ID')}</div>
+                ${!isAvailable ? '<small style="color:red; font-weight:bold;">[SOLD OUT / HABIS]</small>' : ''}
+              </div>
+              <div class="qty-control">
+                ${isAvailable ? `
+                  ${qty > 0 ? `<button type="button" class="btn-qty" onclick="updateQty('${item.id}', -1)">-</button>` : ''}
+                  ${qty > 0 ? `<span class="qty-count">${qty}</span>` : ''}
+                  <button type="button" class="btn-qty plus" onclick="updateQty('${item.id}', 1)">+</button>
+                ` : '<span style="font-size:12px; color:#888;">Habis</span>'}
+              </div>
+            </div>
+          </div>
+        `;
+
+        if (item.category === 'kitchen') {
+          kitchenContainer.innerHTML += cardHTML;
+        } else {
+          barContainer.innerHTML += cardHTML;
+        }
+      });
+
+      updateCartSummary();
+    }
+
+    function updateQty(itemId, change) {
+      const currentQty = cartState[itemId] || 0;
+      const newQty = currentQty + change;
+
+      if (newQty <= 0) {
+        delete cartState[itemId];
+      } else {
+        cartState[itemId] = newQty;
+      }
+
+      renderMenuList();
+    }
+
+    function updateCartSummary() {
+      let total = 0;
+      let totalItems = 0;
+
+      Object.keys(cartState).forEach(id => {
+        const item = menuData.find(m => m.id === id);
+        const qty = cartState[id];
+        if (item) {
+          total += item.price * qty;
+          totalItems += qty;
+        }
+      });
+
+      document.getElementById('total-price').innerText = `Rp ${total.toLocaleString('id-ID')}`;
+      document.getElementById('item-count').innerText = `${totalItems} Item Dipilih`;
+    }
+
+    function sendOrder() {
+      const customerName = document.getElementById('customer-name').value.trim();
+      if (!customerName) return alert('Silakan isi nama Anda terlebih dahulu!');
+
+      const selectedItemIds = Object.keys(cartState);
+      if (selectedItemIds.length === 0) return alert('Pilih minimal 1 makanan atau minuman!');
+
+      let orderItems = [];
+      let grandTotal = 0;
+
+      selectedItemIds.forEach(id => {
+        const item = menuData.find(m => m.id === id);
+        const qty = cartState[id];
+        for (let i = 0; i < qty; i++) {
+          orderItems.push({
+            name: item.name,
+            price: item.price,
+            category: item.category
+          });
+          grandTotal += item.price;
+        }
+      });
+
+      socket.emit('new-order', {
+        customerName: customerName,
+        table: tableNo,
+        items: orderItems,
+        total: grandTotal
+      });
+
+      alert(`Terima kasih ${customerName}, pesanan Anda berhasil dikirim!`);
+      cartState = {};
+      document.getElementById('customer-name').value = '';
+      fetchMenu(); // Refresh stok terbaru
+    }
+  </script>
+</body>
+</html>

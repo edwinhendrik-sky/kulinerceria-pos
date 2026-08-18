@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Kasir - POS & Pembayaran</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: sans-serif; padding: 20px; background: #eef2f5; margin: 0; }
+    .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .btn-back { background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+    
+    .order-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 15px; }
+    .card { background: white; padding: 15px; border-radius: 8px; border-left: 6px solid #ccc; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .status-COOKING { border-color: #17a2b8; }
+    .status-READY { border-color: #28a745; background-color: #f8fff9; }
+
+    .badge { padding: 4px 8px; border-radius: 4px; color: white; font-size: 11px; font-weight: bold; }
+    .bg-cooking { background: #17a2b8; }
+    .bg-ready { background: #28a745; }
+
+    .btn { color: white; border: none; padding: 10px; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 8px; font-weight: bold; }
+    .btn-add { background: #ffc107; color: #000; margin-bottom: 5px; }
+    .btn-print { background: #17a2b8; }
+    .btn-pay { background: #28a745; font-size: 15px; }
+
+    .item-list { list-style: none; padding: 0; margin: 10px 0; }
+    .item-list li { padding: 5px 0; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+
+    .manual-box { background: #f8f9fa; padding: 10px; border-radius: 6px; margin-top: 10px; border: 1px solid #ddd; }
+    .manual-box input { width: 45%; padding: 6px; margin-right: 2%; border: 1px solid #ccc; border-radius: 4px; }
+
+    /* Modal Pembayaran */
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: none; justify-content: center; align-items: center; z-index: 1000; }
+    .modal-box { background: white; width: 100%; max-width: 420px; padding: 25px; border-radius: 12px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+    .modal-box h2 { margin-top: 0; color: #2d3748; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #4a5568; }
+    .form-group select, .form-group input { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 16px; }
+    
+    .quick-cash { display: flex; gap: 8px; margin-top: 8px; }
+    .btn-quick { background: #edf2f7; border: 1px solid #cbd5e0; padding: 6px; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; flex: 1; }
+    .btn-quick:hover { background: #e2e8f0; }
+
+    .change-box { background: #e6fffa; border: 1px solid #b2f5ea; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 15px; }
+    .change-box small { color: #234e52; font-weight: bold; }
+    .change-amount { font-size: 22px; font-weight: bold; color: #2c7a7b; margin-top: 4px; }
+
+    .modal-actions { display: flex; gap: 10px; }
+    .btn-cancel { background: #e53e3e; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; width: 40%; cursor: pointer; }
+    .btn-confirm { background: #38a169; color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; width: 60%; cursor: pointer; }
+
+    /* CSS PRINTER THERMAL */
+    #receipt-template { display: none; }
+    @media print {
+      body * { visibility: hidden; }
+      #receipt-template, #receipt-template * { visibility: visible; }
+      #receipt-template { 
+        display: block !important; 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        width: 58mm; 
+        font-family: 'Courier New', Courier, monospace; 
+        font-size: 11px;
+        color: black;
+      }
+      .receipt-header, .receipt-footer { text-align: center; }
+      .receipt-line { border-bottom: 1px dashed #000; margin: 5px 0; }
+      .receipt-row { display: flex; justify-content: space-between; margin: 3px 0; }
+      .watermark-banner { text-align: center; font-weight: bold; font-size: 12px; padding: 3px 0; border: 1px dashed #000; margin-bottom: 8px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header-bar">
+    <h1>💳 Dashboard Kasir - POS & Pembayaran</h1>
+    <a href="/dashboard.html" class="btn-back">← Kembali ke Dashboard</a>
+  </div>
+
+  <div class="order-grid" id="order-container"></div>
+
+  <!-- Modal Pembayaran & Kembalian -->
+  <div class="modal-overlay" id="payment-modal">
+    <div class="modal-box">
+      <h2>💳 Kasir Pembayaran</h2>
+      <p style="margin-bottom: 15px; font-size: 14px; color: #666;">
+        Pemesan: <strong id="modal-customer">-</strong> (Meja <span id="modal-table">-</span>)
+      </p>
+
+      <div class="form-group">
+        <label>Total Tagihan (Bill):</label>
+        <input type="text" id="modal-total-display" readonly style="background: #f7fafc; font-weight: bold; color: #d32f2f;">
+      </div>
+
+      <div class="form-group">
+        <label>Metode Pembayaran:</label>
+        <select id="payment-method" onchange="togglePaymentType()">
+          <option value="CASH">💵 Tunai / Cash</option>
+          <option value="QRIS">📱 QRIS (Gopay/OVO/Shopee/BCA)</option>
+          <option value="DEBIT">💳 Kartu Debit / Kredit</option>
+          <option value="TRANSFER">Bank Transfer</option>
+        </select>
+      </div>
+
+      <div id="cash-section">
+        <div class="form-group">
+          <label>Uang Diterima (Rp):</label>
+          <input type="number" id="cash-received" placeholder="Masukkan jumlah uang" oninput="calculateChange()">
+          <div class="quick-cash">
+            <button class="btn-quick" onclick="setQuickCash('pas')">Uang Pas</button>
+            <button class="btn-quick" onclick="setQuickCash(50000)">50.000</button>
+            <button class="btn-quick" onclick="setQuickCash(100000)">100.000</button>
+          </div>
+        </div>
+
+        <div class="change-box">
+          <small>Uang Kembalian:</small>
+          <div class="change-amount" id="change-display">Rp 0</div>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closePaymentModal()">Batal</button>
+        <button class="btn-confirm" id="btn-process-pay" onclick="processFinalPayment()">Proses & Cetak Struk</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template Struk Printer Thermal -->
+  <div id="receipt-template">
+    <div id="print-watermark" class="watermark-banner" style="display:none;">*** BON SEMENTARA ***<br><small>(CEK PESANAN)</small></div>
+    
+    <div class="receipt-header">
+      <h3 style="margin:0;">RUMAH MAKAN ENAK</h3>
+      <p style="margin:2px 0;">Jl. Raya No. 123, Indonesia</p>
+      <div class="receipt-line"></div>
+    </div>
+
+    <div class="receipt-row"><span>No. Bill:</span><span id="print-order-id">-</span></div>
+    <div class="receipt-row"><span>Meja:</span><span id="print-table-no">-</span></div>
+    <div class="receipt-row"><span>Waktu:</span><span id="print-time">-</span></div>
+    <div class="receipt-row" id="row-print-method"><span>Metode:</span><span id="print-method">CASH</span></div>
+    <div class="receipt-line"></div>
+    
+    <div id="print-items-list"></div>
+    
+    <div class="receipt-line"></div>
+    <div class="receipt-row" style="font-weight:bold;"><span>TOTAL:</span><span id="print-total-price">Rp 0</span></div>
+    
+    <!-- Bagian Pembayaran (Dapat Disembunyikan untuk Bon Sementara) -->
+    <div id="payment-details-group">
+      <div class="receipt-row"><span>Bayar:</span><span id="print-cash-paid">Rp 0</span></div>
+      <div class="receipt-row"><span>Kembali:</span><span id="print-change">Rp 0</span></div>
+    </div>
+
+    <div class="receipt-line"></div>
+    <div class="receipt-footer">
+      <p style="margin:5px 0;" id="footer-text">*** TERIMA KASIH ***</p>
+      <small id="footer-subtext">Selamat Menikmati Hidangan Anda</small>
+    </div>
+  </div>
+
+  <script>
+    const userRole = localStorage.getItem('userRole');
+    if (!userRole) window.location.href = '/login.html';
+
+    const socket = io();
+    let currentOrdersData = [];
+    let selectedOrder = null;
+
+    socket.on('initial-orders', renderOrders);
+    socket.on('order-updated', renderOrders);
+
+    function renderOrders(orders) {
+      currentOrdersData = orders;
+      const container = document.getElementById('order-container');
+      container.innerHTML = '';
+
+      orders.forEach(order => {
+        if (order.status === 'CLOSED') return;
+
+        let itemsHTML = '';
+        order.items.forEach(item => {
+          itemsHTML += `<li><span>${item.name}</span> <span>Rp ${item.price.toLocaleString('id-ID')}</span></li>`;
+        });
+
+        container.innerHTML += `
+          <div class="card status-${order.status}">
+            <h3>Pemesan: ${order.id} (Meja ${order.table})</h3>
+            <p style="font-size: 12px; color: #666;">Waktu Order: ${order.createdAt}</p>
+            <ul class="item-list">${itemsHTML}</ul>
+            <p style="font-size: 18px;"><strong>Total Bill: Rp ${order.total.toLocaleString('id-ID')}</strong></p>
+            <p>Status: <span class="badge bg-${order.status === 'COOKING' ? 'cooking' : 'ready'}">${order.status === 'COOKING' ? 'OPEN BILL / MASAK' : 'SIAP SERVE'}</span></p>
+
+            <div class="manual-box">
+              <small><strong>+ Tambah Pesanan Manual:</strong></small><br>
+              <input type="text" id="menu-${order.id}" placeholder="Nama Menu">
+              <input type="number" id="price-${order.id}" placeholder="Harga (Rp)">
+              <button class="btn btn-add" onclick="addManualItem('${order.id}')">Tambah ke Bill</button>
+            </div>
+
+            <button class="btn btn-print" onclick="printReceiptDirect('${order.id}')">📋 Cetak Bon Sementara (Cek List)</button>
+            <button class="btn btn-pay" onclick="openPaymentModal('${order.id}')">💳 Pembayaran & Close Bill</button>
+          </div>
+        `;
+      });
+    }
+
+    // Modal Pembayaran Logic
+    function openPaymentModal(orderId) {
+      selectedOrder = currentOrdersData.find(o => o.id === orderId);
+      if (!selectedOrder) return alert('Data pesanan tidak ditemukan!');
+
+      document.getElementById('modal-customer').innerText = selectedOrder.id;
+      document.getElementById('modal-table').innerText = selectedOrder.table;
+      document.getElementById('modal-total-display').value = `Rp ${selectedOrder.total.toLocaleString('id-ID')}`;
+      document.getElementById('cash-received').value = '';
+      document.getElementById('change-display').innerText = 'Rp 0';
+
+      document.getElementById('payment-method').value = 'CASH';
+      togglePaymentType();
+
+      document.getElementById('payment-modal').style.display = 'flex';
+    }
+
+    function closePaymentModal() {
+      document.getElementById('payment-modal').style.display = 'none';
+      selectedOrder = null;
+    }
+
+    function togglePaymentType() {
+      const method = document.getElementById('payment-method').value;
+      const cashSection = document.getElementById('cash-section');
+      if (method === 'CASH') {
+        cashSection.style.display = 'block';
+      } else {
+        cashSection.style.display = 'none';
+      }
+    }
+
+    function calculateChange() {
+      if (!selectedOrder) return 0;
+      const cashInput = parseFloat(document.getElementById('cash-received').value) || 0;
+      const change = cashInput - selectedOrder.total;
+      
+      const changeDisplay = document.getElementById('change-display');
+      if (change < 0) {
+        changeDisplay.innerText = `Kurang Rp ${Math.abs(change).toLocaleString('id-ID')}`;
+        changeDisplay.style.color = '#e53e3e';
+      } else {
+        changeDisplay.innerText = `Rp ${change.toLocaleString('id-ID')}`;
+        changeDisplay.style.color = '#2c7a7b';
+      }
+      return change;
+    }
+
+    function setQuickCash(amount) {
+      if (!selectedOrder) return;
+      if (amount === 'pas') {
+        document.getElementById('cash-received').value = selectedOrder.total;
+      } else {
+        document.getElementById('cash-received').value = amount;
+      }
+      calculateChange();
+    }
+
+    function processFinalPayment() {
+      if (!selectedOrder) return;
+
+      const method = document.getElementById('payment-method').value;
+      let cashPaid = selectedOrder.total;
+      let changeAmount = 0;
+
+      if (method === 'CASH') {
+        cashPaid = parseFloat(document.getElementById('cash-received').value) || 0;
+        if (cashPaid < selectedOrder.total) {
+          return alert('Uang pembayaran tunai masih kurang!');
+        }
+        changeAmount = cashPaid - selectedOrder.total;
+      }
+
+      // Cetak Struk Pembayaran Lunas (isDraft = false)
+      printReceipt(selectedOrder, method, cashPaid, changeAmount, false);
+
+      // Tutup Transaksi di Server
+      socket.emit('update-status', { orderId: selectedOrder.id, status: 'CLOSED' });
+      closePaymentModal();
+    }
+
+    // Fungsi Cetak Bon Sementara (Cek List)
+    function printReceiptDirect(orderId) {
+      const order = currentOrdersData.find(o => o.id === orderId);
+      if (order) {
+        // isDraft = true
+        printReceipt(order, 'BELUM BAYAR', 0, 0, true);
+      }
+    }
+
+    // Fungsi Master Cetak Struk
+    function printReceipt(order, method, cashPaid, changeAmount, isDraft = false) {
+      const watermark = document.getElementById('print-watermark');
+      const paymentGroup = document.getElementById('payment-details-group');
+      const rowMethod = document.getElementById('row-print-method');
+      const footerText = document.getElementById('footer-text');
+      const footerSubtext = document.getElementById('footer-subtext');
+
+      if (isDraft) {
+        // Pengaturan Tampilan Bon Sementara
+        watermark.style.display = 'block';
+        paymentGroup.style.display = 'none'; // Sembunyikan bayar & kembali
+        rowMethod.style.display = 'none';     // Sembunyikan metode bayar
+        footerText.innerText = '*** BON CEK PESANAN ***';
+        footerSubtext.innerText = 'Bukan Bukti Pembayaran Lunas';
+      } else {
+        // Pengaturan Tampilan Struk Lunas
+        watermark.style.display = 'none';
+        paymentGroup.style.display = 'block';
+        rowMethod.style.display = 'flex';
+        footerText.innerText = '*** TERIMA KASIH ***';
+        footerSubtext.innerText = 'Selamat Menikmati Hidangan Anda';
+      }
+
+      document.getElementById('print-order-id').innerText = order.id;
+      document.getElementById('print-table-no').innerText = order.table;
+      document.getElementById('print-time').innerText = order.createdAt;
+      document.getElementById('print-method').innerText = method;
+      document.getElementById('print-total-price').innerText = `Rp ${order.total.toLocaleString('id-ID')}`;
+      document.getElementById('print-cash-paid').innerText = `Rp ${cashPaid.toLocaleString('id-ID')}`;
+      document.getElementById('print-change').innerText = `Rp ${changeAmount.toLocaleString('id-ID')}`;
+
+      const itemCounts = {};
+      order.items.forEach(item => {
+        if (!itemCounts[item.name]) itemCounts[item.name] = { price: item.price, qty: 0 };
+        itemCounts[item.name].qty += 1;
+      });
+
+      const printContainer = document.getElementById('print-items-list');
+      printContainer.innerHTML = '';
+      Object.entries(itemCounts).forEach(([name, info]) => {
+        printContainer.innerHTML += `
+          <div class="receipt-row">
+            <span>${info.qty}x ${name}</span>
+            <span>Rp ${(info.price * info.qty).toLocaleString('id-ID')}</span>
+          </div>
+        `;
+      });
+
+      window.print();
+    }
+
+    function addManualItem(orderId) {
+      const nameInput = document.getElementById(`menu-${orderId}`);
+      const priceInput = document.getElementById(`price-${orderId}`);
+      if (!nameInput.value || !priceInput.value) return alert('Mohon isi nama menu dan harga!');
+
+      socket.emit('add-manual-item', { orderId, itemName: nameInput.value, itemPrice: priceInput.value });
+      nameInput.value = '';
+      priceInput.value = '';
+    }
+  </script>
+</body>
+</html>

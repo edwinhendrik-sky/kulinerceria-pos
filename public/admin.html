@@ -1,0 +1,174 @@
+<div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+  <a href="/dashboard.html" style="background:#6c757d; color:white; padding:8px 15px; border-radius:5px; text-decoration:none; font-weight:bold;">← Kembali ke Dashboard</a>
+  <button onclick="logout()" style="background:#dc3545; color:white; border:none; padding:8px 15px; border-radius:5px; cursor:pointer;">Logout</button>
+</div>
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin - Kelola Menu Rumah Makan</title>
+  <style>
+    body { font-family: sans-serif; background: #f4f6f9; margin: 0; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    
+    /* Navigation Bar Atas */
+    .nav-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .btn-back { background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; }
+    .btn-logout { background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
+    /* Form Box & Table */
+    .card-form { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 25px; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; font-weight: bold; margin-bottom: 5px; }
+    .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+    .btn-submit { background: #28a745; color: white; border: none; padding: 12px 20px; border-radius: 5px; font-weight: bold; cursor: pointer; }
+
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #eee; }
+    th { background: #007bff; color: white; }
+    .img-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 5px; }
+    .btn-action { padding: 6px 10px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+    .btn-edit { background: #ffc107; color: black; }
+    .btn-delete { background: #dc3545; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Tombol Back & Logout -->
+    <div class="nav-bar">
+      <a href="/dashboard.html" class="btn-back">← Kembali ke Dashboard</a>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+
+    <h1>⚙️ Manajemen Menu Makanan & Minuman</h1>
+
+    <div class="card-form">
+      <h3>+ Tambah Menu Baru</h3>
+      <form id="menu-form" onsubmit="saveMenu(event)">
+        <div class="form-group">
+          <label>Nama Menu:</label>
+          <input type="text" id="menu-name" placeholder="Misal: Sate Ayam" required>
+        </div>
+        <div class="form-group">
+          <label>Harga (Rp):</label>
+          <input type="number" id="menu-price" placeholder="Misal: 25000" required>
+        </div>
+        <div class="form-group">
+          <label>Kategori:</label>
+          <select id="menu-category" required>
+            <option value="kitchen">Dapur (Makanan)</option>
+            <option value="bar">Bar (Minuman)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>URL Gambar/Foto Menu:</label>
+          <input type="text" id="menu-image" placeholder="https://link-gambar.com/foto.jpg">
+        </div>
+        <button type="submit" class="btn-submit">Simpan Menu</button>
+      </form>
+    </div>
+
+    <h2>Daftar Menu Saat Ini</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Foto</th>
+          <th>Nama Menu</th>
+          <th>Harga</th>
+          <th>Kategori</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="menu-table-body"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const userRole = localStorage.getItem('userRole');
+    if (userRole !== 'ADMIN') {
+      alert('Akses Ditolak!');
+      window.location.href = '/login.html';
+    }
+
+    function logout() {
+      localStorage.clear();
+      window.location.href = '/login.html';
+    }
+
+    loadMenuData();
+
+    function loadMenuData() {
+      fetch('/api/menu')
+        .then(res => res.json())
+        .then(data => {
+          const tbody = document.getElementById('menu-table-body');
+          tbody.innerHTML = '';
+          data.forEach(item => {
+            tbody.innerHTML += `
+              <tr>
+                <td><img src="${item.image}" class="img-thumb"></td>
+                <td><strong>${item.name}</strong></td>
+                <td>Rp ${item.price.toLocaleString('id-ID')}</td>
+                <td><span style="background:#eee; padding:3px 8px; border-radius:4px;">${item.category.toUpperCase()}</span></td>
+                <td>
+                  <button class="btn-action btn-edit" onclick="editPrice('${item.id}', ${item.price})">Edit Harga</button>
+                  <button class="btn-action btn-delete" onclick="deleteMenu('${item.id}')">Hapus</button>
+                </td>
+              </tr>`;
+          });
+        });
+    }
+
+    function saveMenu(e) {
+      e.preventDefault();
+      const name = document.getElementById('menu-name').value;
+      const price = document.getElementById('menu-price').value;
+      const category = document.getElementById('menu-category').value;
+      const image = document.getElementById('menu-image').value;
+
+      fetch('/api/menu', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, price, category, image })
+      })
+      .then(res => res.json())
+      .then(res => {
+        if (res.success) {
+          alert('Menu berhasil ditambahkan!');
+          document.getElementById('menu-form').reset();
+          loadMenuData();
+        }
+      });
+    }
+
+    function editPrice(id, currentPrice) {
+      const newPrice = prompt('Masukkan harga baru (Rp):', currentPrice);
+      if (newPrice && newPrice !== currentPrice) {
+        fetch(`/api/menu/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ price: parseInt(newPrice) })
+        })
+        .then(res => res.json())
+        .then(res => {
+          if (res.success) {
+            alert('Harga berhasil diperbarui!');
+            loadMenuData();
+          }
+        });
+      }
+    }
+
+    function deleteMenu(id) {
+      if (confirm('Yakin ingin menghapus menu ini?')) {
+        fetch(`/api/menu/${id}`, { method: 'DELETE' })
+          .then(res => res.json())
+          .then(res => {
+            if (res.success) loadMenuData();
+          });
+      }
+    }
+  </script>
+</body>
+</html>

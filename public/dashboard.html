@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard POS Resto</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; }
+    body { background-color: #f4f6f9; color: #333; }
+
+    /* Top Navigation Bar */
+    .navbar { background: #1a202c; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .navbar h2 { font-size: 20px; }
+    .user-info { display: flex; align-items: center; gap: 15px; }
+    .role-badge { background: #3182ce; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+    .btn-logout { background: #e53e3e; color: white; border: none; padding: 8px 15px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+    .btn-logout:hover { background: #c53030; }
+
+    /* Container Card Menu */
+    .container { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+    .welcome-text { margin-bottom: 25px; }
+    .grid-menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; }
+
+    /* Card Item Menu */
+    .menu-card { background: white; padding: 25px; border-radius: 12px; text-decoration: none; color: #2d3748; box-shadow: 0 4px 12px rgba(0,0,0,0.05); transition: all 0.2s ease; border: 2px solid transparent; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .menu-card:hover { transform: translateY(-5px); border-color: #3182ce; box-shadow: 0 8px 20px rgba(0,0,0,0.1); }
+    .menu-icon { font-size: 45px; margin-bottom: 12px; }
+    .menu-title { font-size: 18px; font-weight: bold; margin-bottom: 6px; color: #1a202c; }
+    .menu-desc { font-size: 13px; color: #718096; }
+  </style>
+</head>
+<body>
+
+  <!-- Header Navbar -->
+  <div class="navbar">
+    <h2>🍽️ SHAO KAO CERIA</h2>
+    <div class="user-info">
+      <span id="user-display">Pengguna</span>
+      <span id="role-badge" class="role-badge">ROLE</span>
+      <button class="btn-logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="welcome-text">
+      <h1>Selamat Datang, <span id="welcome-name">User</span>! 👋</h1>
+      <p>Pilih menu modul operasional di bawah ini sesuai dengan akses Anda:</p>
+    </div>
+
+    <!-- Grid Menu Utama -->
+    <div class="grid-menu" id="menu-container">
+      <!-- Menu akan digenerate otomatis menggunakan JavaScript sesuai Role -->
+    </div>
+  </div>
+
+  <script>
+    // 1. Cek Autentikasi Session
+    const userRole = localStorage.getItem('userRole');
+    const userName = localStorage.getItem('userName');
+
+    if (!userRole) {
+      // Jika belum login, tendang kembali ke login.html
+      window.location.href = '/login.html';
+    }
+
+    // Tampilkan Informasi User di Header
+    document.getElementById('user-display').innerText = userName;
+    document.getElementById('welcome-name').innerText = userName;
+    document.getElementById('role-badge').innerText = userRole;
+
+    // 2. Daftar Pilihan Menu Modul
+   const allMenus = [
+  {
+    title: 'Setting Menu',
+    desc: 'Tambah menu, update harga jual & kelola foto makanan',
+    icon: '⚙️',
+    url: '/admin.html',
+    roles: ['ADMIN']
+  },
+  {
+    title: 'Inventory Bahan Baku',
+    desc: 'Atur sisa porsi stok & ubah status habis secara instan',
+    icon: '📦',
+    url: '/inventory.html',
+    roles: ['ADMIN', 'KASIR']
+  },
+  {
+    title: 'Laporan Omset',
+    desc: 'Rekap omzet harian, transaksi lunas & menu best seller',
+    icon: '📊',
+    url: '/reports.html',
+    roles: ['ADMIN']
+  },
+  {
+    title: 'Denah Meja Resto',
+    desc: 'Visualisasi status meja terisi/kosong & fitur pindah meja',
+    icon: '🪑',
+    url: '/tables.html',
+    roles: ['ADMIN', 'KASIR']
+  },
+  {
+    title: 'Kasir / Open Bill',
+    desc: 'Proses transaksi, tambah pesanan manual & penutupan bill',
+    icon: '💳',
+    url: '/kasir.html',
+    roles: ['ADMIN', 'KASIR']
+  },
+  {
+    title: 'Kitchen Display (Makanan)',
+    desc: 'Layar pantau pesanan makanan khusus bagian koki dapur',
+    icon: '👨‍🍳',
+    url: '/kitchen.html',
+    roles: ['ADMIN', 'KASIR']
+  },
+  {
+    title: 'Bar Display (Minuman)',
+    desc: 'Layar pantau pesanan minuman khusus bagian barista/bar',
+    icon: '🍹',
+    url: '/bar.html',
+    roles: ['ADMIN', 'KASIR']
+  },
+  {
+    title: 'e-Menu Digital',
+    desc: 'Simulasi tampilan scan QR Code pemesanan pelanggan',
+    icon: '📱',
+    url: '/order.html?table=1',
+    roles: ['ADMIN', 'KASIR']
+  }
+];
+
+    // 3. Render Menu Sesuai Role Pengguna
+    const menuContainer = document.getElementById('menu-container');
+    menuContainer.innerHTML = '';
+
+    allMenus.forEach(menu => {
+      if (menu.roles.includes(userRole)) {
+        menuContainer.innerHTML += `
+          <a href="${menu.url}" class="menu-card">
+            <div class="menu-icon">${menu.icon}</div>
+            <div class="menu-title">${menu.title}</div>
+            <div class="menu-desc">${menu.desc}</div>
+          </a>
+        `;
+      }
+    });
+
+    // 4. Fungsi Logout
+    function logout() {
+      if (confirm('Apakah Anda yakin ingin keluar dari sistem?')) {
+        localStorage.clear();
+        window.location.href = '/login.html';
+      }
+    }
+  </script>
+</body>
+</html>

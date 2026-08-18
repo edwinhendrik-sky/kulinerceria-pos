@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Bar Display System (Minuman)</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #121824; color: white; margin: 0; }
+    
+    .header-bar { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 2px solid #2c3e50; 
+      padding-bottom: 15px; 
+      margin-bottom: 20px; 
+    }
+    .header-bar h1 { margin: 0; font-size: 24px; color: #fff; }
+    
+    .btn-nav { 
+      background: #6c757d; 
+      color: white; 
+      padding: 8px 16px; 
+      border-radius: 6px; 
+      text-decoration: none; 
+      font-weight: bold; 
+      margin-right: 10px; 
+      display: inline-block;
+    }
+
+    .btn-logout { 
+      background: #dc3545; 
+      color: white; 
+      border: none; 
+      padding: 8px 16px; 
+      border-radius: 6px; 
+      font-weight: bold; 
+      cursor: pointer; 
+    }
+    .btn-logout:hover { background: #c82333; }
+
+    .bar-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
+    .bar-card { background: #1e2736; padding: 15px; border-radius: 8px; border-top: 6px solid #3498db; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+    .bar-card h2 { margin-top: 0; font-size: 20px; color: #3498db; border-bottom: 1px solid #34495e; padding-bottom: 8px; }
+    .bar-item-list { list-style: none; padding: 0; margin: 15px 0; }
+    .bar-item-list li { padding: 8px 0; border-bottom: 1px solid #2c3e50; display: flex; align-items: center; font-size: 18px; font-weight: bold; }
+    .bar-item-list input[type="checkbox"] { margin-right: 12px; transform: scale(1.4); cursor: pointer; }
+    .item-done { text-decoration: line-through; color: #6c757d; }
+    .btn-done { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header Layar Bar -->
+  <div class="header-bar">
+    <h1>🍹 Layar Bar (Khusus Minuman)</h1>
+    <div>
+      <a href="/dashboard.html" id="btn-back-dash" class="btn-nav" style="display:none;">← Dashboard</a>
+      <button type="button" class="btn-logout" id="btn-logout-bar">Logout</button>
+    </div>
+  </div>
+
+  <div class="bar-grid" id="bar-container"></div>
+
+  <script>
+    // 1. Event Listener Langsung untuk Tombol Logout (Menghindari Bentrok Nama Fungsi)
+    document.getElementById('btn-logout-bar').addEventListener('click', function() {
+      if (confirm('Keluar dari layar bar?')) {
+        localStorage.clear();
+        window.location.href = '/login.html';
+      }
+    });
+
+    // 2. Cek Autentikasi Session
+    const userRole = localStorage.getItem('userRole');
+    if (!userRole) {
+      window.location.href = '/login.html';
+    } else if (userRole === 'ADMIN' || userRole === 'KASIR') {
+      document.getElementById('btn-back-dash').style.display = 'inline-block';
+    }
+
+    // 3. Socket.io Realtime Logic
+    const socket = io();
+
+    socket.on('initial-orders', renderBar);
+    socket.on('order-updated', renderBar);
+
+    function renderBar(orders) {
+      const container = document.getElementById('bar-container');
+      container.innerHTML = '';
+
+      const activeOrders = orders.filter(o => o.status === 'COOKING');
+
+      let hasItems = false;
+
+      activeOrders.forEach(order => {
+        const drinkItems = order.items.filter(i => i.category === 'bar');
+
+        if (drinkItems.length > 0) {
+          hasItems = true;
+          let itemsHTML = '';
+          drinkItems.forEach((item, index) => {
+            itemsHTML += `
+              <li>
+                <input type="checkbox" id="bar-check-${order.id}-${index}" onchange="toggleCheck(this)">
+                <label for="bar-check-${order.id}-${index}">${item.name}</label>
+              </li>`;
+          });
+
+          container.innerHTML += `
+            <div class="bar-card">
+              <h2>MEJA ${order.table} - ${order.id}</h2>
+              <p style="font-size: 12px; color: #aaa;">Masuk: ${order.createdAt}</p>
+              <ul class="bar-item-list">${itemsHTML}</ul>
+              <button class="btn-done" onclick="finishBar('${order.id}')">Selesai Racik</button>
+            </div>
+          `;
+        }
+      });
+
+      if (!hasItems) {
+        container.innerHTML = '<p style="color: #888; font-size: 18px;">Belum ada pesanan minuman.</p>';
+      }
+    }
+
+    function toggleCheck(checkbox) {
+      const label = checkbox.nextElementSibling;
+      checkbox.checked ? label.classList.add('item-done') : label.classList.remove('item-done');
+    }
+
+    function finishBar(orderId) {
+      socket.emit('update-status', { orderId, status: 'READY' });
+    }
+  </script>
+</body>
+</html>

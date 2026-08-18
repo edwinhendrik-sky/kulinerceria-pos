@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - POS Rumah Makan</title>
+  <style>
+    body { font-family: sans-serif; background: #1a202c; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .login-card { background: white; padding: 30px; border-radius: 12px; width: 100%; max-width: 350px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .login-card h2 { text-align: center; margin-bottom: 20px; color: #2d3748; }
+    .form-group { margin-bottom: 15px; }
+    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #4a5568; font-size: 14px; }
+    .form-group input { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+    .btn-login { background: #3182ce; color: white; border: none; width: 100%; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; }
+    .btn-login:hover { background: #2b6cb0; }
+    #error-msg { color: #e53e3e; font-size: 13px; text-align: center; margin-bottom: 10px; display: none; }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <h2>🔐 Login POS Resto</h2>
+    <div id="error-msg"></div>
+    <form onsubmit="handleLogin(event)">
+      <div class="form-group">
+        <label>Username:</label>
+        <input type="text" id="username" placeholder="Masukkan username" required>
+      </div>
+      <div class="form-group">
+        <label>Password:</label>
+        <input type="password" id="password" placeholder="Masukkan password" required>
+      </div>
+      <button type="submit" id="btn-submit" class="btn-login">Masuk Sistem</button>
+    </form>
+  </div>
+
+  <script>
+    function handleLogin(e) {
+      e.preventDefault();
+      
+      const usernameInput = document.getElementById('username').value.trim();
+      const passwordInput = document.getElementById('password').value.trim();
+      const errorDiv = document.getElementById('error-msg');
+      const btnSubmit = document.getElementById('btn-submit');
+
+      errorDiv.style.display = 'none';
+      btnSubmit.innerText = 'Memproses...';
+      btnSubmit.disabled = true;
+
+      fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: usernameInput, password: passwordInput })
+      })
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok && data.success) {
+          // Simpan status session
+          localStorage.setItem('userRole', data.role);
+          localStorage.setItem('userName', data.name);
+
+          // Redirect sesuai Hak Akses Role
+          if (data.role === 'KITCHEN') {
+            window.location.href = '/kitchen.html'; // Langsung ke Layar Dapur
+          } else if (data.role === 'BAR') {
+            window.location.href = '/bar.html';     // Langsung ke Layar Bar
+          } else {
+            window.location.href = '/dashboard.html'; // Admin & Kasir ke Portal Dashboard
+          }
+        } else {
+          throw new Error(data.message || 'Gagal login!');
+        }
+      })
+      .catch(err => {
+        errorDiv.innerText = err.message || 'Koneksi server terganggu!';
+        errorDiv.style.display = 'block';
+      })
+      .finally(() => {
+        btnSubmit.innerText = 'Masuk Sistem';
+        btnSubmit.disabled = false;
+      });
+    }
+  </script>
+</body>
+</html>
