@@ -3,83 +3,206 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login - POS Rumah Makan</title>
+  <title>Login POS - Shao Kao & Chinese Street Food</title>
   <style>
-    body { font-family: sans-serif; background: #1a202c; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-    .login-card { background: white; padding: 30px; border-radius: 12px; width: 100%; max-width: 350px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
-    .login-card h2 { text-align: center; margin-bottom: 20px; color: #2d3748; }
-    .form-group { margin-bottom: 15px; }
-    .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #4a5568; font-size: 14px; }
-    .form-group input { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-    .btn-login { background: #3182ce; color: white; border: none; width: 100%; padding: 12px; border-radius: 6px; font-weight: bold; font-size: 15px; cursor: pointer; }
-    .btn-login:hover { background: #2b6cb0; }
-    #error-msg { color: #e53e3e; font-size: 13px; text-align: center; margin-bottom: 10px; display: none; }
+    :root {
+      --primary-red: #c0392b;
+      --primary-hover: #e74c3c;
+      --gold-accent: #f1c40f;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      /* Background Suasana Barbeque Shao Kao khas China */
+      background: linear-gradient(rgba(15, 12, 12, 0.75), rgba(20, 10, 10, 0.85)), 
+                  url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=1600&q=80') no-repeat center center/cover;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      width: 100%;
+      max-width: 420px;
+      padding: 40px 32px;
+      border-radius: 20px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), 0 0 15px rgba(192, 57, 43, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      text-align: center;
+    }
+
+    .brand-header {
+      margin-bottom: 28px;
+    }
+
+    .brand-icon {
+      font-size: 42px;
+      margin-bottom: 8px;
+      display: inline-block;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+    }
+
+    .brand-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #2c3e50;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-subtitle {
+      font-size: 13px;
+      color: #7f8c8d;
+      margin-top: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #34495e;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 15px;
+      transition: all 0.25s ease;
+      background: #ffffff;
+      outline: none;
+    }
+
+    .form-group input:focus {
+      border-color: var(--primary-red);
+      box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.15);
+    }
+
+    .btn-login {
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary-red), #962d22);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 12px rgba(192, 57, 43, 0.35);
+      margin-top: 10px;
+    }
+
+    .btn-login:hover {
+      background: linear-gradient(135deg, var(--primary-hover), var(--primary-red));
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(192, 57, 43, 0.45);
+    }
+
+    .btn-login:active {
+      transform: translateY(0);
+    }
+
+    .login-footer {
+      margin-top: 25px;
+      font-size: 12px;
+      color: #95a5a6;
+      border-top: 1px solid #edf2f7;
+      padding-top: 18px;
+    }
+
+    /* Alert Message */
+    .alert-error {
+      background: #fde8e8;
+      color: #9b1c1c;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 18px;
+      display: none;
+      border: 1px solid #f8b4b4;
+    }
   </style>
 </head>
 <body>
 
-  <div class="login-card">
-    <h2>🔐 Login POS Resto</h2>
-    <div id="error-msg"></div>
-    <form onsubmit="handleLogin(event)">
+  <div class="login-container">
+    <div class="brand-header">
+      <div class="brand-icon">🏮</div>
+      <div class="brand-title">KULINER CERIA</div>
+      <div class="brand-subtitle">Shao Kao & Chinese BBQ POS</div>
+    </div>
+
+    <div id="error-message" class="alert-error"></div>
+
+    <form id="login-form">
       <div class="form-group">
-        <label>Username:</label>
-        <input type="text" id="username" placeholder="Masukkan username" required>
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="Masukkan username" required autocomplete="username">
       </div>
+
       <div class="form-group">
-        <label>Password:</label>
-        <input type="password" id="password" placeholder="Masukkan password" required>
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Masukkan password" required autocomplete="current-password">
       </div>
-      <button type="submit" id="btn-submit" class="btn-login">Masuk Sistem</button>
+
+      <button type="submit" class="btn-login">MASUK SISTEM POS ➔</button>
     </form>
+
+    <div class="login-footer">
+      System Point of Sales v2.0 • Hak Cipta Resto Shao Kao
+    </div>
   </div>
 
   <script>
-    function handleLogin(e) {
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
       e.preventDefault();
       
-      const usernameInput = document.getElementById('username').value.trim();
-      const passwordInput = document.getElementById('password').value.trim();
-      const errorDiv = document.getElementById('error-msg');
-      const btnSubmit = document.getElementById('btn-submit');
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value.trim();
+      const errorBox = document.getElementById('error-message');
 
-      errorDiv.style.display = 'none';
-      btnSubmit.innerText = 'Memproses...';
-      btnSubmit.disabled = true;
+      errorBox.style.display = 'none';
 
-      fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: usernameInput, password: passwordInput })
-      })
-      .then(async (res) => {
-        const data = await res.json();
-        if (res.ok && data.success) {
-          // Simpan status session
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
           localStorage.setItem('userRole', data.role);
           localStorage.setItem('userName', data.name);
-
-          // Redirect sesuai Hak Akses Role
-          if (data.role === 'KITCHEN') {
-            window.location.href = '/kitchen.html'; // Langsung ke Layar Dapur
-          } else if (data.role === 'BAR') {
-            window.location.href = '/bar.html';     // Langsung ke Layar Bar
-          } else {
-            window.location.href = '/dashboard.html'; // Admin & Kasir ke Portal Dashboard
-          }
+          window.location.href = '/dashboard.html';
         } else {
-          throw new Error(data.message || 'Gagal login!');
+          errorBox.innerText = data.message || 'Username atau Password salah!';
+          errorBox.style.display = 'block';
         }
-      })
-      .catch(err => {
-        errorDiv.innerText = err.message || 'Koneksi server terganggu!';
-        errorDiv.style.display = 'block';
-      })
-      .finally(() => {
-        btnSubmit.innerText = 'Masuk Sistem';
-        btnSubmit.disabled = false;
-      });
-    }
+      } catch (err) {
+        errorBox.innerText = 'Gagal terhubung ke server. Pastikan server sudah berjalan!';
+        errorBox.style.display = 'block';
+      }
+    });
   </script>
 </body>
 </html>
