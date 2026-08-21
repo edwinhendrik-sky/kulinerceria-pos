@@ -50,8 +50,8 @@
 
   <div class="category-nav">
     <button class="cat-btn active" onclick="filterCategory('all', this)">Semua Menu</button>
-    <button class="cat-btn" onclick="filterCategory('sate', this)">🍢 Shao Kao</button>
-    <button class="cat-btn" onclick="filterCategory('kitchen', this)">🍳 Makanan</button>
+    <button class="cat-btn" onclick="filterCategory('shaokao', this)">🍢 Sate Shao Kao</button>
+    <button class="cat-btn" onclick="filterCategory('kitchen', this)">🍳 Makanan Utama</button>
     <button class="cat-btn" onclick="filterCategory('bar', this)">🍹 Minuman</button>
   </div>
 
@@ -68,21 +68,31 @@
   </div>
 
   <script>
+    // Ambil nomor meja dari URL parameter (?table=1)
     const urlParams = new URLSearchParams(window.location.search);
     const tableNo = urlParams.get('table') || '1';
     document.getElementById('table-number-display').innerText = tableNo;
 
-    const socket = io();
+    // Inisialisasi Socket.io secara aman
+    let socket;
+    try {
+      socket = io();
+    } catch (e) {
+      console.error("Socket.io gagal dimuat:", e);
+    }
+
     let allMenus = [];
     let cart = [];
     let currentCategory = 'all';
 
+    // Ambil daftar menu dari server
     fetch('/api/menu')
       .then(res => res.json())
       .then(data => {
         allMenus = data;
         renderMenus();
-      });
+      })
+      .catch(err => console.error("Error fetching menu:", err));
 
     function filterCategory(cat, btn) {
       currentCategory = cat;
@@ -92,59 +102,58 @@
     }
 
     function renderMenus() {
-  const container = document.getElementById('menu-container');
-  container.innerHTML = '';
+      const container = document.getElementById('menu-container');
+      container.innerHTML = '';
 
-  const filtered = allMenus.filter(item => {
-    const nameLower = (item.name || '').toLowerCase();
-    const catLower = (item.category || '').toLowerCase();
-    const idLower = (item.id || '').toLowerCase();
+      const filtered = allMenus.filter(item => {
+        const nameLower = (item.name || '').toLowerCase();
+        const catLower = (item.category || '').toLowerCase();
+        const idLower = (item.id || '').toLowerCase();
 
-    // Deteksi menu Shao Kao berdasarkan Kategori, Nama, atau ID
-    const isShaoKao = catLower === 'shaokao' || 
-                      nameLower.includes('sate') || 
-                      nameLower.includes('shao') || 
-                      nameLower.includes('kao') || 
-                      idLower.startsWith('sk');
+        const isShaoKao = catLower === 'shaokao' || 
+                          nameLower.includes('sate') || 
+                          nameLower.includes('shao') || 
+                          nameLower.includes('kao') || 
+                          idLower.startsWith('sk');
 
-    if (currentCategory === 'all') {
-      return true;
-    } else if (currentCategory === 'sate') {
-      return isShaoKao;
-    } else if (currentCategory === 'kitchen') {
-      return (catLower === 'kitchen' || catLower === 'makanan') && !isShaoKao;
-    } else if (currentCategory === 'bar') {
-      return catLower === 'bar' || catLower === 'minuman';
+        if (currentCategory === 'all') {
+          return true;
+        } else if (currentCategory === 'shaokao') {
+          return isShaoKao;
+        } else if (currentCategory === 'kitchen') {
+          return (catLower === 'kitchen' || catLower === 'makanan') && !isShaoKao;
+        } else if (currentCategory === 'bar') {
+          return catLower === 'bar' || catLower === 'minuman';
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-msg">
+            Belum ada menu di kategori ini.<br>
+            <small>Silakan tambahkan menu dari Dashboard Admin.</small>
+          </div>`;
+        return;
+      }
+
+      filtered.forEach(item => {
+        const isOut = !item.isAvailable || item.stock <= 0;
+        container.innerHTML += `
+          <div class="menu-card">
+            <img src="${item.image || 'https://via.placeholder.com/300'}" class="menu-img" alt="${item.name}" onerror="this.src='https://via.placeholder.com/300?text=Shao+Kao'">
+            <div class="menu-info">
+              <div class="menu-title">${item.name}</div>
+              <div class="menu-price">Rp ${(item.price || 0).toLocaleString('id-ID')}</div>
+              <div class="menu-stock">${isOut ? '❌ Stok Habis' : 'Sisa Stok: ' + item.stock}</div>
+              <button class="btn-add" ${isOut ? 'disabled' : ''} onclick="addToCart('${item.id}')">
+                ${isOut ? 'Habis' : '+ Tambah'}
+              </button>
+            </div>
+          </div>
+        `;
+      });
     }
-    return true;
-  });
-
-  if (filtered.length === 0) {
-    container.innerHTML = `
-      <div class="empty-msg" style="grid-column: span 2; text-align: center; padding: 40px; color: #64748b;">
-        ❌ Belum ada menu di kategori ini.<br>
-        <small>Silakan restart server atau tambahkan menu dari Setting Menu Admin.</small>
-      </div>`;
-    return;
-  }
-
-  filtered.forEach(item => {
-    const isOut = !item.isAvailable || item.stock <= 0;
-    container.innerHTML += `
-      <div class="menu-card">
-        <img src="${item.image || 'https://via.placeholder.com/300'}" class="menu-img" alt="${item.name}" onerror="this.src='https://via.placeholder.com/300?text=Shao+Kao'">
-        <div class="menu-info">
-          <div class="menu-title">${item.name}</div>
-          <div class="menu-price">Rp ${(item.price || 0).toLocaleString('id-ID')}</div>
-          <div class="menu-stock">${isOut ? '❌ Stok Habis' : 'Sisa Stok: ' + item.stock}</div>
-          <button class="btn-add" ${isOut ? 'disabled' : ''} onclick="addToCart('${item.id}')">
-            ${isOut ? 'Habis' : '+ Tambah'}
-          </button>
-        </div>
-      </div>
-    `;
-  });
-}
 
     function addToCart(menuId) {
       const menu = allMenus.find(m => m.id === menuId);
@@ -161,24 +170,35 @@
     }
 
     function submitOrder() {
-      if (cart.length === 0) return alert('Pilih minimal 1 menu sebelum memesan!');
+      if (cart.length === 0) {
+        alert('Pilih minimal 1 menu sebelum memesan!');
+        return;
+      }
       
       const customerName = prompt('Masukkan Nama Anda:', 'Pelanggan Meja ' + tableNo);
       if (!customerName) return;
 
+      const customerPhone = prompt('Masukkan No. HP / WhatsApp (Opsional - Untuk Poin Member):', '');
+
       const total = cart.reduce((sum, item) => sum + item.price, 0);
+      
       const orderData = {
         customerName: customerName,
+        customerPhone: customerPhone || null,
         table: tableNo,
         items: cart,
         total: total
       };
 
-      socket.emit('new-order', orderData);
-      alert('Pesanan berhasil dikirim ke Dapur & Bar!');
-      cart = [];
-      updateCartUI();
-      window.location.reload();
+      if (socket) {
+        socket.emit('new-order', orderData);
+        alert('🎉 Pesanan berhasil dikirim ke Dapur & Bar!');
+        cart = [];
+        updateCartUI();
+        window.location.reload();
+      } else {
+        alert('Gagal terhubung ke server realtime. Pastikan koneksi internet stabil!');
+      }
     }
   </script>
 </body>
