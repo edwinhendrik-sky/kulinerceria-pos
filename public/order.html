@@ -92,55 +92,59 @@
     }
 
     function renderMenus() {
-      const container = document.getElementById('menu-container');
-      container.innerHTML = '';
+  const container = document.getElementById('menu-container');
+  container.innerHTML = '';
 
-      const filtered = allMenus.filter(item => {
-        const nameLower = (item.name || '').toLowerCase();
-        const catLower = (item.category || '').toLowerCase();
-        const idLower = (item.id || '').toLowerCase();
+  const filtered = allMenus.filter(item => {
+    const nameLower = (item.name || '').toLowerCase();
+    const catLower = (item.category || '').toLowerCase();
+    const idLower = (item.id || '').toLowerCase();
 
-        // Pengecekan apakah item termasuk varian Sate / Shao Kao
-        const isShaoKao = nameLower.includes('sate') || 
-                          nameLower.includes('shao') || 
-                          nameLower.includes('kao') || 
-                          catLower === 'shaokao' || 
-                          idLower.startsWith('sk');
+    // Deteksi menu Shao Kao berdasarkan Kategori, Nama, atau ID
+    const isShaoKao = catLower === 'shaokao' || 
+                      nameLower.includes('sate') || 
+                      nameLower.includes('shao') || 
+                      nameLower.includes('kao') || 
+                      idLower.startsWith('sk');
 
-        if (currentCategory === 'all') {
-          return true;
-        } else if (currentCategory === 'shaokao') {
-          return isShaoKao;
-        } else if (currentCategory === 'kitchen') {
-          return catLower === 'kitchen' && !isShaoKao;
-        } else if (currentCategory === 'bar') {
-          return catLower === 'bar';
-        }
-        return true;
-      });
-
-      if (filtered.length === 0) {
-        container.innerHTML = `<div class="empty-msg">Belum ada menu di kategori ini.<br><small>Silakan tambahkan menu Sate dari Dashboard Admin (Setting Menu).</small></div>`;
-        return;
-      }
-
-      filtered.forEach(item => {
-        const isOut = !item.isAvailable || item.stock <= 0;
-        container.innerHTML += `
-          <div class="menu-card">
-            <img src="${item.image || 'https://via.placeholder.com/300'}" class="menu-img" alt="${item.name}" onerror="this.src='https://via.placeholder.com/300?text=Shao+Kao'">
-            <div class="menu-info">
-              <div class="menu-title">${item.name}</div>
-              <div class="menu-price">Rp ${(item.price || 0).toLocaleString('id-ID')}</div>
-              <div class="menu-stock">${isOut ? '❌ Stok Habis' : 'Sisa Stok: ' + item.stock}</div>
-              <button class="btn-add" ${isOut ? 'disabled' : ''} onclick="addToCart('${item.id}')">
-                ${isOut ? 'Habis' : '+ Tambah'}
-              </button>
-            </div>
-          </div>
-        `;
-      });
+    if (currentCategory === 'all') {
+      return true;
+    } else if (currentCategory === 'shaokao') {
+      return isShaoKao;
+    } else if (currentCategory === 'kitchen') {
+      return (catLower === 'kitchen' || catLower === 'makanan') && !isShaoKao;
+    } else if (currentCategory === 'bar') {
+      return catLower === 'bar' || catLower === 'minuman';
     }
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-msg" style="grid-column: span 2; text-align: center; padding: 40px; color: #64748b;">
+        ❌ Belum ada menu di kategori ini.<br>
+        <small>Silakan restart server atau tambahkan menu dari Setting Menu Admin.</small>
+      </div>`;
+    return;
+  }
+
+  filtered.forEach(item => {
+    const isOut = !item.isAvailable || item.stock <= 0;
+    container.innerHTML += `
+      <div class="menu-card">
+        <img src="${item.image || 'https://via.placeholder.com/300'}" class="menu-img" alt="${item.name}" onerror="this.src='https://via.placeholder.com/300?text=Shao+Kao'">
+        <div class="menu-info">
+          <div class="menu-title">${item.name}</div>
+          <div class="menu-price">Rp ${(item.price || 0).toLocaleString('id-ID')}</div>
+          <div class="menu-stock">${isOut ? '❌ Stok Habis' : 'Sisa Stok: ' + item.stock}</div>
+          <button class="btn-add" ${isOut ? 'disabled' : ''} onclick="addToCart('${item.id}')">
+            ${isOut ? 'Habis' : '+ Tambah'}
+          </button>
+        </div>
+      </div>
+    `;
+  });
+}
 
     function addToCart(menuId) {
       const menu = allMenus.find(m => m.id === menuId);
