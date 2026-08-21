@@ -38,12 +38,12 @@ db.serialize(() => {
 
   // Daftar Menu Shao Kao & Default yang PASTI disuntikkan ke Database
   const defaultMenus = [
-    { id: 'sk1', name: 'Sate Daging Sapi Shao Kao', price: 9000, category: 'shaokao', stock: 50, image: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=400&q=80' },
-    { id: 'sk2', name: 'Sate Ayam Tabur Jintan', price: 7000, category: 'shaokao', stock: 50, image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80' },
-    { id: 'sk3', name: 'Sate Kulit Ayam Crispy BBQ', price: 6000, category: 'shaokao', stock: 40, image: 'https://images.unsplash.com/photo-1532636875304-0c89119d9b4d?w=400&q=80' },
-    { id: 'sk4', name: 'Sate Enoki Gulung Sapi', price: 12000, category: 'shaokao', stock: 30, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80' },
-    { id: 'sk5', name: 'Sate Bakso Sapi Bumbu Pedas', price: 6000, category: 'shaokao', stock: 45, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&q=80' },
-    { id: 'sk6', name: 'Sate Sosis Beef Cocktail BBQ', price: 7000, category: 'shaokao', stock: 35, image: 'https://images.unsplash.com/photo-1597289124948-688c1a35b782?w=400&q=80' },
+    { id: 'sk1', name: 'Sate Daging Sapi Shao Kao', price: 9000, category: 'sate', stock: 50, image: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=400&q=80' },
+    { id: 'sk2', name: 'Sate Ayam Tabur Jintan', price: 7000, category: 'sate', stock: 50, image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80' },
+    { id: 'sk3', name: 'Sate Kulit Ayam Crispy BBQ', price: 6000, category: 'sate', stock: 40, image: 'https://images.unsplash.com/photo-1532636875304-0c89119d9b4d?w=400&q=80' },
+    { id: 'sk4', name: 'Sate Enoki Gulung Sapi', price: 12000, category: 'sate', stock: 30, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80' },
+    { id: 'sk5', name: 'Sate Bakso Sapi Bumbu Pedas', price: 6000, category: 'sate', stock: 45, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&q=80' },
+    { id: 'sk6', name: 'Sate Sosis Beef Cocktail BBQ', price: 7000, category: 'sate', stock: 35, image: 'https://images.unsplash.com/photo-1597289124948-688c1a35b782?w=400&q=80' },
     { id: 'm1', name: 'Nasi Goreng Spesial', price: 25000, category: 'kitchen', stock: 20, image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&q=80' },
     { id: 'b1', name: 'Es Teh Manis', price: 5000, category: 'bar', stock: 50, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80' },
     { id: 'b2', name: 'Kopi Susu Gula Aren', price: 18000, category: 'bar', stock: 25, image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=400&q=80' }
