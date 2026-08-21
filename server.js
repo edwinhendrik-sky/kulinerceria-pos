@@ -197,22 +197,6 @@ app.delete('/api/menu/:id', (req, res) => {
 let tablesMaster = Array.from({ length: 12 }, (_, i) => ({ id: (i + 1).toString(), name: `Meja ${i + 1}` }));
 app.get('/api/tables', (req, res) => res.json(tablesMaster));
 
-// REST API AMBIL SEMUA DATA MEMBER & REKAP POIN
-app.get('/api/members-list', (req, res) => {
-  db.all("SELECT * FROM members ORDER BY points DESC", [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
-  });
-});
-
-// REST API REKAP STATISTIK MEMBERSHIP
-app.get('/api/members-summary', (req, res) => {
-  db.get("SELECT COUNT(*) as total_members, SUM(points) as total_points FROM members", [], (err, row) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(row || { total_members: 0, total_points: 0 });
-  });
-});
-
 // --- REST API LAPORAN PENJUALAN ---
 app.get('/api/reports', (req, res) => {
   db.all("SELECT * FROM sales_reports ORDER BY id DESC", [], (err, rows) => {
@@ -361,6 +345,21 @@ app.post('/api/reset-database', (req, res) => {
     // db.run("DELETE FROM menus");
 
     res.json({ success: true, message: 'Database transaksi dan riwayat berhasil dibersihkan!' });
+  });
+});
+// 1. REST API AMBIL SEMUA DATA MEMBER
+app.get('/api/members-list', (req, res) => {
+  db.all("SELECT * FROM members ORDER BY points DESC", [], (err, rows) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(rows || []);
+  });
+});
+
+// 2. REST API RINGKASAN MEMBERSHIP
+app.get('/api/members-summary', (req, res) => {
+  db.get("SELECT COUNT(*) as total_members, SUM(points) as total_points FROM members", [], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(row || { total_members: 0, total_points: 0 });
   });
 });
 server.listen(PORT, () => console.log(`🚀 Server POS SQLite Berjalan di http://localhost:${PORT}`));
