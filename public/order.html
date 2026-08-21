@@ -11,7 +11,7 @@
     
     header { background: #c0392b; color: white; padding: 18px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
     header h1 { font-size: 20px; font-weight: 800; }
-    header p { font-size: 13px; opacity: 0.9; margin-top: 2px; }
+    header p { font-size: 14px; opacity: 0.9; margin-top: 2px; }
 
     /* Category Filter Nav */
     .category-nav { display: flex; gap: 8px; overflow-x: auto; padding: 12px 15px; background: white; border-bottom: 1px solid #e2e8f0; position: sticky; top: 62px; z-index: 99; }
@@ -64,6 +64,30 @@
       <div class="cart-info"><span id="cart-count">0</span> Item Dipilih</div>
       <div class="cart-total" id="cart-total-display">Rp 0</div>
     </div>
+    <!-- Tombol Cek Poin Member di Header/Filter -->
+<button onclick="checkMemberPoints()" style="background: #f39c12; color: white; border: none; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer;">
+  ⭐ Cek Poin Saya
+</button>
+
+<script>
+async function checkMemberPoints() {
+  const phone = prompt('Masukkan Nomor HP / WhatsApp Anda:');
+  if (!phone) return;
+
+  try {
+    const res = await fetch(`/api/member/${phone}`);
+    const data = await res.json();
+
+    if (data && data.phone) {
+      alert(`🎉 Halo ${data.name}!\n\nNomor HP: ${data.phone}\nSisa Poin Anda: ⭐ ${data.points} Poin\n\nKumpulkan terus poinnya untuk ditukarkan dengan promo spesial Shao Kao!`);
+    } else {
+      alert('Nomor HP belum terdaftar sebagai member. Poin akan otomatis didapatkan setelah Anda melakukan pesanan pertama!');
+    }
+  } catch (err) {
+    alert('Gagal mengambil data poin.');
+  }
+}
+</script>
     <button class="btn-checkout" onclick="submitOrder()">Kirim Pesanan ➔</button>
   </div>
 
