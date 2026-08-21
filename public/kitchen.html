@@ -2,134 +2,114 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Kitchen Display System (Makanan)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Layar Dapur - Kitchen Display System</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #1e1e1e; color: white; margin: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { background: #1e1e1e; color: #ffffff; padding: 20px; }
     
-    .header-kitchen { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center; 
-      border-bottom: 2px solid #333; 
-      padding-bottom: 15px; 
-      margin-bottom: 20px; 
-    }
-    .header-kitchen h1 { margin: 0; font-size: 24px; color: #fff; }
-    
-    .btn-nav { 
-      background: #6c757d; 
-      color: white; 
-      padding: 8px 16px; 
-      border-radius: 6px; 
-      text-decoration: none; 
-      font-weight: bold; 
-      margin-right: 10px; 
-      display: inline-block;
-    }
-    
-    .btn-logout { 
-      background: #dc3545; 
-      color: white; 
-      border: none; 
-      padding: 8px 16px; 
-      border-radius: 6px; 
-      font-weight: bold; 
-      cursor: pointer; 
-    }
-    .btn-logout:hover { background: #c82333; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #333; padding-bottom: 15px; }
+    .header h1 { font-size: 24px; color: #f39c12; display: flex; align-items: center; gap: 10px; }
+    .status-online { background: #27ae60; color: white; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
 
-    .kds-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 15px; }
-    .kds-card { background: #2d2d2d; padding: 15px; border-radius: 8px; border-top: 6px solid #e74c3c; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-    .kds-card h2 { margin-top: 0; font-size: 20px; color: #e74c3c; border-bottom: 1px solid #444; padding-bottom: 8px; }
-    .kds-item-list { list-style: none; padding: 0; margin: 15px 0; }
-    .kds-item-list li { padding: 8px 0; border-bottom: 1px solid #3d3d3d; display: flex; align-items: center; font-size: 18px; font-weight: bold; }
-    .kds-item-list input[type="checkbox"] { margin-right: 12px; transform: scale(1.4); cursor: pointer; }
-    .item-done { text-decoration: line-through; color: #6c757d; }
-    .btn-done { background: #28a745; color: white; border: none; padding: 12px; width: 100%; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    .orders-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+    
+    .order-card { background: #2d2d2d; border-radius: 12px; border-top: 6px solid #e74c3c; padding: 18px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; justify-content: space-between; }
+    .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #444; padding-bottom: 8px; }
+    .table-title { font-size: 18px; font-weight: 800; color: #e74c3c; }
+    .order-time { font-size: 12px; color: #aaa; }
+
+    .items-list { list-style: none; margin-bottom: 20px; }
+    .item-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed #444; font-size: 16px; font-weight: 600; }
+    .item-row input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: #27ae60; }
+    .item-badge { background: #d35400; color: white; font-size: 10px; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; margin-left: auto; }
+
+    .btn-done { background: #27ae60; color: white; border: none; padding: 12px; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; width: 100%; transition: background 0.2s; }
+    .btn-done:hover { background: #219150; }
+
+    .no-orders { grid-column: 1 / -1; text-align: center; color: #777; padding: 60px; font-size: 18px; }
   </style>
 </head>
 <body>
 
-  <!-- Header Layar Dapur -->
-  <div class="header-kitchen">
-    <h1>🍳 Layar Dapur (Khusus Makanan)</h1>
-    <div>
-      <a href="/dashboard.html" id="btn-back-dash" class="btn-nav" style="display:none;">← Dashboard</a>
-      <button type="button" class="btn-logout" onclick="handleLogout()">Logout</button>
-    </div>
+  <div class="header">
+    <h1>🍳 Layar Dapur (Khusus Makanan & Sate Shao Kao)</h1>
+    <span class="status-online">🟢 TERHUBUNG REALTIME</span>
   </div>
 
-  <div class="kds-grid" id="kds-container"></div>
+  <div class="orders-grid" id="orders-container">
+    <div class="no-orders">Belum ada pesanan makanan aktif saat ini...</div>
+  </div>
 
   <script>
-    // 1. Fungsi Logout Global
-    function handleLogout() {
-      if (confirm('Keluar dari layar dapur?')) {
-        localStorage.clear();
-        window.location.href = '/login.html';
-      }
-    }
-
-    // 2. Cek Autentikasi Session
-    const userRole = localStorage.getItem('userRole');
-    if (!userRole) {
-      window.location.href = '/login.html';
-    } else if (userRole === 'ADMIN' || userRole === 'KASIR') {
-      document.getElementById('btn-back-dash').style.display = 'inline-block';
-    }
-
-    // 3. Socket.io Logic
     const socket = io();
+    let activeOrders = [];
 
-    socket.on('initial-orders', renderKDS);
-    socket.on('order-updated', renderKDS);
+    // Dengarkan pesanan masuk secara Realtime
+    socket.on('order-update', (orders) => {
+      activeOrders = orders;
+      renderOrders();
+    });
 
-    function renderKDS(orders) {
-      const container = document.getElementById('kds-container');
+    function renderOrders() {
+      const container = document.getElementById('orders-container');
       container.innerHTML = '';
 
-      const kitchenOrders = orders.filter(o => o.status === 'COOKING');
+      let hasKitchenOrders = false;
 
-      let hasItems = false;
+      activeOrders.forEach(order => {
+        // Filter item makanan utama ATAU sate shao kao
+        const kitchenItems = order.items.filter(item => {
+          const cat = (item.category || '').toLowerCase();
+          const name = (item.name || '').toLowerCase();
+          const id = (item.id || '').toLowerCase();
 
-      kitchenOrders.forEach(order => {
-        const foodItems = order.items.filter(i => i.category === 'kitchen');
+          return cat === 'kitchen' || cat === 'shaokao' || name.includes('sate') || name.includes('shao') || id.startsWith('sk');
+        });
 
-        if (foodItems.length > 0) {
-          hasItems = true;
+        // Jika pesanan mengandung makanan / sate
+        if (kitchenItems.length > 0) {
+          hasKitchenOrders = true;
+
           let itemsHTML = '';
-          foodItems.forEach((item, index) => {
+          kitchenItems.forEach((item, index) => {
+            const isSate = item.category === 'sate' || item.name.toLowerCase().includes('sate');
             itemsHTML += `
-              <li>
-                <input type="checkbox" id="kds-check-${order.id}-${index}" onchange="toggleCheck(this)">
-                <label for="kds-check-${order.id}-${index}">${item.name}</label>
-              </li>`;
+              <li class="item-row">
+                <input type="checkbox" id="chk-${order.id}-${index}">
+                <label for="chk-${order.id}-${index}">${item.name}</label>
+                ${isSate ? '<span class="item-badge">SHAO KAO</span>' : ''}
+              </li>
+            `;
           });
 
           container.innerHTML += `
-            <div class="kds-card">
-              <h2>MEJA ${order.table} - ${order.id}</h2>
-              <p style="font-size: 12px; color: #aaa;">Masuk: ${order.createdAt}</p>
-              <ul class="kds-item-list">${itemsHTML}</ul>
-              <button class="btn-done" onclick="finishKitchen('${order.id}')">Selesai Masak</button>
+            <div class="order-card" id="card-${order.id}">
+              <div>
+                <div class="card-head">
+                  <div class="table-title">MEJA ${order.table} - ${order.customerName || 'Pelanggan'}</div>
+                  <div class="order-time">Masuk: ${order.time || 'Baru Saja'}</div>
+                </div>
+                <ul class="items-list">
+                  ${itemsHTML}
+                </ul>
+              </div>
+              <button class="btn-done" onclick="finishOrder('${order.id}')">Selesai Masak</button>
             </div>
           `;
         }
       });
 
-      if (!hasItems) {
-        container.innerHTML = '<p style="color: #888; font-size: 18px;">Belum ada pesanan makanan.</p>';
+      if (!hasKitchenOrders) {
+        container.innerHTML = `<div class="no-orders">Belum ada pesanan makanan/sate aktif saat ini...</div>`;
       }
     }
 
-    function toggleCheck(checkbox) {
-      const label = checkbox.nextElementSibling;
-      checkbox.checked ? label.classList.add('item-done') : label.classList.remove('item-done');
-    }
-
-    function finishKitchen(orderId) {
-      socket.emit('update-status', { orderId, status: 'READY' });
+    function finishOrder(orderId) {
+      if (confirm('Tandai pesanan makanan ini sudah selesai dimasak?')) {
+        socket.emit('complete-kitchen-order', orderId);
+      }
     }
   </script>
 </body>
