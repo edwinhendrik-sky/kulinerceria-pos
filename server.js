@@ -36,17 +36,25 @@ db.serialize(() => {
     image TEXT
   )`);
 
-  // Insert Data Awal Menu (Jika masih kosong)
-  db.get("SELECT COUNT(*) as count FROM menus", (err, row) => {
-    if (row && row.count === 0) {
-      const stmt = db.prepare("INSERT INTO menus VALUES (?, ?, ?, ?, ?, ?, ?)");
-      stmt.run('m1', 'Nasi Goreng Spesial', 25000, 'kitchen', 20, 1, 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=300&q=80');
-      stmt.run('m2', 'Mie Goreng Seafood', 28000, 'kitchen', 15, 1, 'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=300&q=80');
-      stmt.run('b1', 'Es Teh Manis', 5000, 'bar', 50, 1, 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=300&q=80');
-      stmt.run('b2', 'Kopi Susu Gula Aren', 18000, 'bar', 10, 1, 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=300&q=80');
-      stmt.finalize();
-    }
+  // Daftar Menu Shao Kao & Default yang PASTI disuntikkan ke Database
+  const defaultMenus = [
+    { id: 'sk1', name: 'Sate Daging Sapi Shao Kao', price: 9000, category: 'shaokao', stock: 50, image: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=400&q=80' },
+    { id: 'sk2', name: 'Sate Ayam Tabur Jintan', price: 7000, category: 'shaokao', stock: 50, image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80' },
+    { id: 'sk3', name: 'Sate Kulit Ayam Crispy BBQ', price: 6000, category: 'shaokao', stock: 40, image: 'https://images.unsplash.com/photo-1532636875304-0c89119d9b4d?w=400&q=80' },
+    { id: 'sk4', name: 'Sate Enoki Gulung Sapi', price: 12000, category: 'shaokao', stock: 30, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80' },
+    { id: 'sk5', name: 'Sate Bakso Sapi Bumbu Pedas', price: 6000, category: 'shaokao', stock: 45, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&q=80' },
+    { id: 'sk6', name: 'Sate Sosis Beef Cocktail BBQ', price: 7000, category: 'shaokao', stock: 35, image: 'https://images.unsplash.com/photo-1597289124948-688c1a35b782?w=400&q=80' },
+    { id: 'm1', name: 'Nasi Goreng Spesial', price: 25000, category: 'kitchen', stock: 20, image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&q=80' },
+    { id: 'b1', name: 'Es Teh Manis', price: 5000, category: 'bar', stock: 50, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80' },
+    { id: 'b2', name: 'Kopi Susu Gula Aren', price: 18000, category: 'bar', stock: 25, image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=400&q=80' }
+  ];
+
+  // Gunakan INSERT OR IGNORE agar menu yang belum ada otomatis masuk
+  const stmt = db.prepare("INSERT OR IGNORE INTO menus (id, name, price, category, stock, isAvailable, image) VALUES (?, ?, ?, ?, ?, 1, ?)");
+  defaultMenus.forEach(m => {
+    stmt.run(m.id, m.name, m.price, m.category, m.stock, m.image);
   });
+  stmt.finalize();
 
   // 2. Tabel Pesanan Aktif
   db.run(`CREATE TABLE IF NOT EXISTS orders (
@@ -58,7 +66,7 @@ db.serialize(() => {
     createdAt TEXT NOT NULL
   )`);
 
-  // 3. Tabel Laporan Transaksi (History Closed)
+  // 3. Tabel Laporan Transaksi
   db.run(`CREATE TABLE IF NOT EXISTS sales_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id TEXT,
