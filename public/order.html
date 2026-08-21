@@ -50,8 +50,8 @@
 
   <div class="category-nav">
     <button class="cat-btn active" onclick="filterCategory('all', this)">Semua Menu</button>
-    <button class="cat-btn" onclick="filterCategory('shaokao', this)">🍢 Sate Shao Kao</button>
-    <button class="cat-btn" onclick="filterCategory('kitchen', this)">🍳 Makanan Utama</button>
+    <button class="cat-btn" onclick="filterCategory('sate', this)">🍢 Shao Kao</button>
+    <button class="cat-btn" onclick="filterCategory('kitchen', this)">🍳 Makanan</button>
     <button class="cat-btn" onclick="filterCategory('bar', this)">🍹 Minuman</button>
   </div>
 
@@ -109,7 +109,7 @@
 
     if (currentCategory === 'all') {
       return true;
-    } else if (currentCategory === 'shaokao') {
+    } else if (currentCategory === 'sate') {
       return isShaoKao;
     } else if (currentCategory === 'kitchen') {
       return (catLower === 'kitchen' || catLower === 'makanan') && !isShaoKao;
