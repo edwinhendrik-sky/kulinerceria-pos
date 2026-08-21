@@ -77,7 +77,47 @@ db.serialize(() => {
     closedAt TEXT
   )`);
 });
+// Tambahkan Tabel CRM ke db.serialize() di server.js
+db.serialize(() => {
+  // 1. Tabel Members
+  db.run(`CREATE TABLE IF NOT EXISTS members (
+    phone TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    points INTEGER DEFAULT 0,
+    createdAt TEXT NOT NULL
+  )`);
 
+  // 2. Tabel Vouchers
+  db.run(`CREATE TABLE IF NOT EXISTS vouchers (
+    code TEXT PRIMARY KEY,
+    discount_amount INTEGER NOT NULL,
+    min_purchase INTEGER DEFAULT 0,
+    isActive INTEGER DEFAULT 1
+  )`);
+
+  // Insert Voucher Default jika belum ada
+  db.run("INSERT OR IGNORE INTO vouchers VALUES ('SHAOKAO10K', 10000, 50000, 1)");
+});
+
+// REST API CEK MEMBER & POIN
+app.get('/api/member/:phone', (req, res) => {
+  db.get("SELECT * FROM members WHERE phone = ?", [req.params.phone], (err, row) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json(row || { found: false });
+  });
+});
+
+// REST API CEK VOUCHER
+app.post('/api/voucher/check', (req, res) => {
+  const { code, total } = req.body;
+  db.get("SELECT * FROM vouchers WHERE code = ? AND isActive = 1", [code.toUpperCase()], (err, row) => {
+    if (!row) return res.json({ valid: false, message: 'Kode voucher tidak ditemukan / tidak aktif!' });
+    if (total < row.min_purchase) {
+      return res.json({ valid: false, message: `Minimal transaksi Rp ${row.min_purchase.toLocaleString('id-ID')}` });
+    }
+    res.json({ valid: true, discount: row.discount_amount });
+  });
+});
 // Master Data Login
 const USERS = {
   admin:   { password: 'admin123',   role: 'ADMIN',   name: 'Pemilik / Admin' },
@@ -211,6 +251,20 @@ io.on('connection', (socket) => {
 
   // Tambah Pesanan Baru
   socket.on('new-order', (data) => {
+    // Di dalam socket.on('new-order', (data) => { ... })
+if (data.customerPhone) {
+  const earnedPoints = Math.floor(data.total / 10000); // 1 Poin tiap Rp 10.000
+  const timeNow = new Date().toLocaleDateString('id-ID');
+
+  db.get("SELECT * FROM members WHERE phone = ?", [data.customerPhone], (err, row) => {
+    if (row) {
+      db.run("UPDATE members SET points = points + ? WHERE phone = ?", [earnedPoints, data.customerPhone]);
+    } else {
+      db.run("INSERT INTO members (phone, name, points, createdAt) VALUES (?, ?, ?, ?)", 
+        [data.customerPhone, data.customerName, earnedPoints, timeNow]);
+    }
+  });
+}
     const timeNow = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
     db.get("SELECT * FROM orders WHERE table_no = ? AND status != 'CLOSED'", [data.table], (err, row) => {
