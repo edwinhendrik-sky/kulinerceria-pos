@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -11,16 +12,21 @@ const io = new Server(server);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Konfigurasi path database (Mendukung persistent disk /data jika di server production seperti Render)
+const dbPath = process.env.NODE_ENV === 'production' && fs.existsSync('/data')
+  ? '/data/database.sqlite' 
+  : path.join(__dirname, 'database.sqlite');
+
 // Inisialisasi Database SQLite
-const db = new sqlite3.Database('./database.sqlite', (err) => {
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Gagal terhubung ke SQLite:', err.message);
   } else {
-    console.log('Terhubung ke database SQLite.');
+    console.log(`Terhubung ke database SQLite di: ${dbPath}`);
   }
 });
 
-// Setup Tabel Database & Auto-Seed Data Shao Kao
+// Setup Tabel Database (Tanpa auto-insert menu default agar editan online aman)
 db.serialize(() => {
   // 1. Tabel Menus
   db.run(`CREATE TABLE IF NOT EXISTS menus (
@@ -32,25 +38,6 @@ db.serialize(() => {
     isAvailable INTEGER DEFAULT 1,
     image TEXT
   )`);
-
-  // Auto Insert Menu Default (Shao Kao, Makanan, Minuman)
-  const defaultMenus = [
-    { id: 'sk1', name: 'Sate Daging Sapi Shao Kao', price: 9000, category: 'shaokao', stock: 50, image: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=400&q=80' },
-    { id: 'sk2', name: 'Sate Ayam Tabur Jintan', price: 7000, category: 'shaokao', stock: 50, image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80' },
-    { id: 'sk3', name: 'Sate Kulit Ayam Crispy BBQ', price: 6000, category: 'shaokao', stock: 40, image: 'https://images.unsplash.com/photo-1532636875304-0c89119d9b4d?w=400&q=80' },
-    { id: 'sk4', name: 'Sate Enoki Gulung Sapi', price: 12000, category: 'shaokao', stock: 30, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80' },
-    { id: 'sk5', name: 'Sate Bakso Sapi Bumbu Pedas', price: 6000, category: 'shaokao', stock: 45, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&q=80' },
-    { id: 'sk6', name: 'Sate Sosis Beef Cocktail BBQ', price: 7000, category: 'shaokao', stock: 35, image: 'https://images.unsplash.com/photo-1597289124948-688c1a35b782?w=400&q=80' },
-    { id: 'm1', name: 'Nasi Goreng Spesial', price: 25000, category: 'kitchen', stock: 20, image: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=400&q=80' },
-    { id: 'b1', name: 'Es Teh Manis', price: 5000, category: 'bar', stock: 50, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80' },
-    { id: 'b2', name: 'Kopi Susu Gula Aren', price: 18000, category: 'bar', stock: 25, image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=400&q=80' }
-  ];
-
-  const stmt = db.prepare("INSERT OR IGNORE INTO menus (id, name, price, category, stock, isAvailable, image) VALUES (?, ?, ?, ?, ?, 1, ?)");
-  defaultMenus.forEach(m => {
-    stmt.run(m.id, m.name, m.price, m.category, m.stock, m.image);
-  });
-  stmt.finalize();
 
   // 2. Tabel Orders (Pesanan Aktif)
   db.run(`CREATE TABLE IF NOT EXISTS orders (
@@ -189,7 +176,12 @@ app.get('/api/reports', (req, res) => {
     let totalOmzet = 0;
     let bestSellers = {};
     let history = rows.map(r => {
-      let parsedItems = JSON.parse(r.items);
+      let parsedItems = [];
+      try {
+        parsedItems = JSON.parse(r.items || '[]');
+      } catch (e) {
+        parsedItems = [];
+      }
       totalOmzet += r.total;
       parsedItems.forEach(i => {
         bestSellers[i.name] = (bestSellers[i.name] || 0) + 1;
@@ -217,14 +209,22 @@ app.get('/api/reports', (req, res) => {
 
 function broadcastActiveOrders() {
   db.all("SELECT * FROM orders WHERE status != 'CLOSED'", [], (err, rows) => {
-    if (!err) {
-      const parsedOrders = rows.map(r => ({
-        ...r,
-        table: r.table_no,
-        customerName: r.customer_name,
-        customerPhone: r.customer_phone,
-        items: JSON.parse(r.items)
-      }));
+    if (!err && rows) {
+      const parsedOrders = rows.map(r => {
+        let items = [];
+        try {
+          items = JSON.parse(r.items || '[]');
+        } catch (e) {
+          items = [];
+        }
+        return {
+          ...r,
+          table: r.table_no,
+          customerName: r.customer_name,
+          customerPhone: r.customer_phone,
+          items: items
+        };
+      });
       io.emit('order-update', parsedOrders);
       io.emit('initial-orders', parsedOrders);
       io.emit('order-updated', parsedOrders);
@@ -256,7 +256,12 @@ io.on('connection', (socket) => {
   socket.on('add-manual-item', ({ orderId, itemName, itemPrice }) => {
     db.get("SELECT * FROM orders WHERE id = ?", [orderId], (err, row) => {
       if (row) {
-        let items = JSON.parse(row.items);
+        let items = [];
+        try {
+          items = JSON.parse(row.items || '[]');
+        } catch (e) {
+          items = [];
+        }
         items.push({ name: itemName, price: itemPrice, category: 'kitchen' });
         let newTotal = row.total + itemPrice;
 
@@ -285,7 +290,7 @@ io.on('connection', (socket) => {
               // B. Update status pesanan menjadi CLOSED
               db.run("UPDATE orders SET status = 'CLOSED' WHERE id = ?", [orderId], () => {
                 
-                // C. TAUTAN REKAP POIN MEMBER OTOMATIS
+                // C. REKAP POIN MEMBER OTOMATIS
                 if (phone) {
                   const earnedPoints = Math.floor(totalPaid / 10000); // 1 Poin tiap Rp 10.000
                   const dateNow = new Date().toLocaleDateString('id-ID');
