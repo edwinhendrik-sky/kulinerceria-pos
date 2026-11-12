@@ -203,11 +203,19 @@
 
       const total = cart.reduce((sum, item) => sum + item.price, 0);
       
+      // Memastikan setiap item membawa kategori agar tersaring di Dapur/Bar
+      const formattedItems = cart.map(item => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        category: item.category || 'kitchen'
+      }));
+
       const orderData = {
         customerName: customerName,
         customerPhone: customerPhone || null,
         table: tableNo,
-        items: cart,
+        items: formattedItems,
         total: total
       };
 
