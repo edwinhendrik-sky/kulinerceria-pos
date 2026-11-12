@@ -46,8 +46,11 @@
     const socket = io();
     let activeOrders = [];
 
-    // Dengarkan pesanan masuk secara Realtime
     socket.on('order-update', (orders) => {
+      activeOrders = orders;
+      renderOrders();
+    });
+    socket.on('initial-orders', (orders) => {
       activeOrders = orders;
       renderOrders();
     });
@@ -57,10 +60,10 @@
       container.innerHTML = '';
 
       let hasKitchenOrders = false;
+      const filteredOrders = activeOrders.filter(o => o.status !== 'CLOSED');
 
-      activeOrders.forEach(order => {
-        // Filter item makanan utama ATAU sate shao kao
-        const kitchenItems = order.items.filter(item => {
+      filteredOrders.forEach(order => {
+        const kitchenItems = (order.items || []).filter(item => {
           const cat = (item.category || '').toLowerCase();
           const name = (item.name || '').toLowerCase();
           const id = (item.id || '').toLowerCase();
@@ -68,13 +71,12 @@
           return cat === 'kitchen' || cat === 'shaokao' || name.includes('sate') || name.includes('shao') || id.startsWith('sk');
         });
 
-        // Jika pesanan mengandung makanan / sate
         if (kitchenItems.length > 0) {
           hasKitchenOrders = true;
 
           let itemsHTML = '';
           kitchenItems.forEach((item, index) => {
-            const isSate = item.category === 'sate' || item.name.toLowerCase().includes('sate');
+            const isSate = item.category === 'shaokao' || item.name.toLowerCase().includes('sate');
             itemsHTML += `
               <li class="item-row">
                 <input type="checkbox" id="chk-${order.id}-${index}">
@@ -89,7 +91,7 @@
               <div>
                 <div class="card-head">
                   <div class="table-title">MEJA ${order.table} - ${order.customerName || 'Pelanggan'}</div>
-                  <div class="order-time">Masuk: ${order.time || 'Baru Saja'}</div>
+                  <div class="order-time">Masuk: ${order.createdAt || 'Baru Saja'}</div>
                 </div>
                 <ul class="items-list">
                   ${itemsHTML}

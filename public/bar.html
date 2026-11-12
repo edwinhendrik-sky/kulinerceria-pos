@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Bar Display System (Minuman)</title>
+  <title>Bar Display System (Minuman) - Shao Kao</title>
   <script src="/socket.io/socket.io.js"></script>
   <style>
     body { font-family: sans-serif; padding: 20px; background: #121824; color: white; margin: 0; }
@@ -63,7 +63,6 @@
   <div class="bar-grid" id="bar-container"></div>
 
   <script>
-    // 1. Event Listener Langsung untuk Tombol Logout (Menghindari Bentrok Nama Fungsi)
     document.getElementById('btn-logout-bar').addEventListener('click', function() {
       if (confirm('Keluar dari layar bar?')) {
         localStorage.clear();
@@ -71,7 +70,6 @@
       }
     });
 
-    // 2. Cek Autentikasi Session
     const userRole = localStorage.getItem('userRole');
     if (!userRole) {
       window.location.href = '/login.html';
@@ -79,22 +77,24 @@
       document.getElementById('btn-back-dash').style.display = 'inline-block';
     }
 
-    // 3. Socket.io Realtime Logic
     const socket = io();
 
     socket.on('initial-orders', renderBar);
     socket.on('order-updated', renderBar);
+    socket.on('order-update', renderBar);
 
     function renderBar(orders) {
       const container = document.getElementById('bar-container');
       container.innerHTML = '';
 
-      const activeOrders = orders.filter(o => o.status === 'COOKING');
-
+      const activeOrders = orders.filter(o => o.status !== 'CLOSED');
       let hasItems = false;
 
       activeOrders.forEach(order => {
-        const drinkItems = order.items.filter(i => i.category === 'bar');
+        const drinkItems = (order.items || []).filter(i => {
+          const cat = (i.category || '').toLowerCase();
+          return cat === 'bar' || cat === 'minuman';
+        });
 
         if (drinkItems.length > 0) {
           hasItems = true;
@@ -109,8 +109,8 @@
 
           container.innerHTML += `
             <div class="bar-card">
-              <h2>MEJA ${order.table} - ${order.id}</h2>
-              <p style="font-size: 12px; color: #aaa;">Masuk: ${order.createdAt}</p>
+              <h2>MEJA ${order.table} - ${order.customerName || order.id}</h2>
+              <p style="font-size: 12px; color: #aaa;">Masuk: ${order.createdAt || 'Baru Saja'}</p>
               <ul class="bar-item-list">${itemsHTML}</ul>
               <button class="btn-done" onclick="finishBar('${order.id}')">Selesai Racik</button>
             </div>
@@ -119,7 +119,7 @@
       });
 
       if (!hasItems) {
-        container.innerHTML = '<p style="color: #888; font-size: 18px;">Belum ada pesanan minuman.</p>';
+        container.innerHTML = '<p style="color: #888; font-size: 18px; text-align:center; padding:40px;">Belum ada pesanan minuman aktif.</p>';
       }
     }
 

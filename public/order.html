@@ -64,40 +64,20 @@
       <div class="cart-info"><span id="cart-count">0</span> Item Dipilih</div>
       <div class="cart-total" id="cart-total-display">Rp 0</div>
     </div>
-    <!-- Tombol Cek Poin Member di Header/Filter -->
-<button onclick="checkMemberPoints()" style="background: #f39c12; color: white; border: none; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer;">
-  ⭐ Cek Poin Saya
-</button>
-
-<script>
-async function checkMemberPoints() {
-  const phone = prompt('Masukkan Nomor HP / WhatsApp Anda:');
-  if (!phone) return;
-
-  try {
-    const res = await fetch(`/api/member/${phone}`);
-    const data = await res.json();
-
-    if (data && data.phone) {
-      alert(`🎉 Halo ${data.name}!\n\nNomor HP: ${data.phone}\nSisa Poin Anda: ⭐ ${data.points} Poin\n\nKumpulkan terus poinnya untuk ditukarkan dengan promo spesial Shao Kao!`);
-    } else {
-      alert('Nomor HP belum terdaftar sebagai member. Poin akan otomatis didapatkan setelah Anda melakukan pesanan pertama!');
-    }
-  } catch (err) {
-    alert('Gagal mengambil data poin.');
-  }
-}
-</script>
-    <button class="btn-checkout" onclick="submitOrder()">Kirim Pesanan ➔</button>
+    
+    <div style="display: flex; gap: 8px;">
+      <button onclick="checkMemberPoints()" style="background: #f39c12; color: white; border: none; padding: 10px 14px; border-radius: 8px; font-weight: bold; font-size: 12px; cursor: pointer;">
+        ⭐ Cek Poin
+      </button>
+      <button class="btn-checkout" onclick="submitOrder()">Kirim Pesanan ➔</button>
+    </div>
   </div>
 
   <script>
-    // Ambil nomor meja dari URL parameter (?table=1)
     const urlParams = new URLSearchParams(window.location.search);
     const tableNo = urlParams.get('table') || '1';
     document.getElementById('table-number-display').innerText = tableNo;
 
-    // Inisialisasi Socket.io secara aman
     let socket;
     try {
       socket = io();
@@ -109,7 +89,6 @@ async function checkMemberPoints() {
     let cart = [];
     let currentCategory = 'all';
 
-    // Ambil daftar menu dari server
     fetch('/api/menu')
       .then(res => res.json())
       .then(data => {
@@ -165,7 +144,7 @@ async function checkMemberPoints() {
         const isOut = !item.isAvailable || item.stock <= 0;
         container.innerHTML += `
           <div class="menu-card">
-            <img src="${item.image || 'https://via.placeholder.com/300'}" class="menu-img" alt="${item.name}" onerror="this.src='https://via.placeholder.com/300?text=Shao+Kao'">
+            <img src="${item.image || 'https://via.placeholder.com/300'}" class="menu-img" alt="${item.name}" onerror="this.src='https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80'">
             <div class="menu-info">
               <div class="menu-title">${item.name}</div>
               <div class="menu-price">Rp ${(item.price || 0).toLocaleString('id-ID')}</div>
@@ -191,6 +170,24 @@ async function checkMemberPoints() {
       document.getElementById('cart-count').innerText = cart.length;
       const total = cart.reduce((sum, item) => sum + item.price, 0);
       document.getElementById('cart-total-display').innerText = `Rp ${total.toLocaleString('id-ID')}`;
+    }
+
+    async function checkMemberPoints() {
+      const phone = prompt('Masukkan Nomor HP / WhatsApp Anda:');
+      if (!phone) return;
+
+      try {
+        const res = await fetch(`/api/member/${phone}`);
+        const data = await res.json();
+
+        if (data && data.phone) {
+          alert(`🎉 Halo ${data.name}!\n\nNomor HP: ${data.phone}\nSisa Poin Anda: ⭐ ${data.points} Poin\n\nKumpulkan terus poinnya untuk ditukarkan dengan promo spesial Shao Kao!`);
+        } else {
+          alert('Nomor HP belum terdaftar sebagai member. Poin akan otomatis didapatkan setelah Anda melakukan pesanan pertama!');
+        }
+      } catch (err) {
+        alert('Gagal mengambil data poin.');
+      }
     }
 
     function submitOrder() {
