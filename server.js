@@ -26,7 +26,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
-// Setup Tabel Database (Tanpa auto-insert menu default agar editan online aman)
+// Setup Tabel Database & Auto-Seed Menu Default (Stok Default 50 untuk Semua Menu)
 db.serialize(() => {
   // 1. Tabel Menus
   db.run(`CREATE TABLE IF NOT EXISTS menus (
@@ -34,10 +34,32 @@ db.serialize(() => {
     name TEXT NOT NULL,
     price INTEGER NOT NULL,
     category TEXT NOT NULL,
-    stock INTEGER DEFAULT 0,
+    stock INTEGER DEFAULT 50,
     isAvailable INTEGER DEFAULT 1,
     image TEXT
-  )`);
+  )`, () => {
+    const defaultImage = 'https://encrypted-tbn3.gstatic.com/licensed-image?q=tbn:ANd9GcTWmjez5R8Mihu3KxDto9GpTKkUMF22YdX75nIVaYqiUjb00IpDqAJIhmArRgC53lIcVXqNF382XH1a3cY';
+    
+    // Daftar menu default dengan stok di-set 50 semua
+    const defaultMenus = [
+      { id: 'sk1', name: 'Sate Ayam', price: 7500, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'sk2', name: 'Sate Saikoro Beef', price: 15000, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'sk3', name: 'Sate Domba', price: 12000, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'sk4', name: 'Sate Kulit', price: 6500, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'sk5', name: 'Sate Jamur Sapi', price: 12000, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'sk6', name: 'Sate Ati', price: 10000, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'sk7', name: 'Sate Kucai', price: 5000, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'sk8', name: 'Sate Brokoli', price: 6500, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'sk9', name: 'Sate Jamur', price: 5000, category: 'shaokao', stock: 50, image: defaultImage },
+      { id: 'b1', name: 'Es Teh Manis', price: 5000, category: 'bar', stock: 50, image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400&q=80' }
+    ];
+
+    const stmt = db.prepare("INSERT OR IGNORE INTO menus (id, name, price, category, stock, isAvailable, image) VALUES (?, ?, ?, ?, ?, 1, ?)");
+    defaultMenus.forEach(m => {
+      stmt.run(m.id, m.name, m.price, m.category, m.stock, m.image);
+    });
+    stmt.finalize();
+  });
 
   // 2. Tabel Orders (Pesanan Aktif)
   db.run(`CREATE TABLE IF NOT EXISTS orders (
@@ -99,6 +121,15 @@ app.post('/api/login', (req, res) => {
   }
 });
 
+// Master Tables Endpoint untuk Denah Meja
+app.get('/api/tables', (req, res) => {
+  const tables = [];
+  for (let i = 1; i <= 10; i++) {
+    tables.push({ id: i.toString(), name: `Meja ${i}` });
+  }
+  res.json(tables);
+});
+
 // Get Menu List
 app.get('/api/menu', (req, res) => {
   db.all("SELECT * FROM menus", [], (err, rows) => {
@@ -107,7 +138,7 @@ app.get('/api/menu', (req, res) => {
   });
 });
 
-// Update Menu Item / Stock
+// Update Menu Item / Stock / Price
 app.put('/api/menu/:id', (req, res) => {
   const { id } = req.params;
   const { stock, isAvailable, price } = req.body;
@@ -329,6 +360,15 @@ io.on('connection', (socket) => {
   socket.on('complete-kitchen-order', (orderId) => {
     db.run("UPDATE orders SET status = 'READY' WHERE id = ?", [orderId], () => {
       broadcastActiveOrders();
+    });
+  });
+
+  // 5. Pindah Meja (Move Table)
+  socket.on('move-table', ({ oldTable, newTable }) => {
+    db.run("UPDATE orders SET table_no = ? WHERE table_no = ? AND status != 'CLOSED'", [newTable, oldTable], (err) => {
+      if (!err) {
+        broadcastActiveOrders();
+      }
     });
   });
 });
