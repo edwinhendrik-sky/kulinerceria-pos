@@ -12,7 +12,6 @@
     .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; }
     .btn-back { background: #6c757d; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; }
 
-    /* Ringkasan Legend Status */
     .legend { display: flex; gap: 20px; background: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 25px; }
     .legend-item { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 14px; }
     .dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
@@ -20,10 +19,8 @@
     .dot-occupied { background: #dc3545; }
     .dot-ready { background: #17a2b8; }
 
-    /* Grid Layout Meja */
     .tables-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px; }
     
-    /* Card Meja */
     .table-card { background: white; border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-top: 8px solid #28a745; transition: transform 0.2s; position: relative; }
     .table-card:hover { transform: translateY(-3px); }
     
@@ -48,14 +45,12 @@
     <a href="/dashboard.html" class="btn-back">← Kembali ke Dashboard</a>
   </div>
 
-  <!-- Legend Indikator Status -->
   <div class="legend">
     <div class="legend-item"><span class="dot dot-available"></span> Meja Kosong</div>
     <div class="legend-item"><span class="dot dot-occupied"></span> Terisi / Diproses</div>
     <div class="legend-item"><span class="dot dot-ready"></span> Makanan Siap Disajikan</div>
   </div>
 
-  <!-- Grid Denah Meja -->
   <div class="tables-grid" id="tables-container"></div>
 
   <script>
@@ -63,13 +58,17 @@
     let masterTables = [];
     let currentOrders = [];
 
-    // Ambil daftar meja dari server
-    fetch('/api/tables')
-      .then(res => res.json())
-      .then(data => {
-        masterTables = data;
+    async function loadData() {
+      try {
+        const res = await fetch('/api/tables');
+        masterTables = await res.json();
         renderTables();
-      });
+      } catch (err) {
+        console.error('Gagal memuat data meja:', err);
+      }
+    }
+
+    loadData();
 
     socket.on('initial-orders', (orders) => {
       currentOrders = orders;
@@ -81,6 +80,11 @@
       renderTables();
     });
 
+    socket.on('order-update', (orders) => {
+      currentOrders = orders;
+      renderTables();
+    });
+
     function renderTables() {
       const container = document.getElementById('tables-container');
       if (!container || masterTables.length === 0) return;
@@ -88,8 +92,8 @@
       container.innerHTML = '';
 
       masterTables.forEach(table => {
-        // Cari apakah ada pesanan aktif di meja ini
-        const activeOrder = currentOrders.find(o => o.table === table.id && o.status !== 'CLOSED');
+        // Cocokkan nomor meja secara akurat (string / number safe)
+        const activeOrder = currentOrders.find(o => String(o.table) === String(table.id) && o.status !== 'CLOSED');
 
         let statusClass = 'available';
         let statusText = 'KOSONG';
@@ -107,9 +111,10 @@
 
           infoHTML = `
             <div class="order-info">
-              <strong>Atas Nama:</strong> ${activeOrder.id}<br>
-              <strong>Total Bill:</strong> Rp ${activeOrder.total.toLocaleString('id-ID')}<br>
-              <strong>Item:</strong> ${activeOrder.items.length} porsi
+              <strong>Order ID:</strong> ${activeOrder.id}<br>
+              <strong>Pemesan:</strong> ${activeOrder.customerName || 'Pelanggan'}<br>
+              <strong>Total Bill:</strong> Rp ${(activeOrder.total || 0).toLocaleString('id-ID')}<br>
+              <strong>Item:</strong> ${(activeOrder.items || []).length} porsi
             </div>
           `;
 
@@ -127,23 +132,10 @@
       });
     }
 
-    // Fungsi Pindah Meja
     function moveTablePrompt(oldTableNo) {
       const targetTableNo = prompt(`Pindahkan pemesan dari MEJA ${oldTableNo} ke Meja Nomor Berapa?`);
-      
       if (targetTableNo) {
-        const targetExist = masterTables.find(t => t.id === targetTableNo.trim());
-        if (!targetExist) {
-          return alert('Nomor meja tujuan tidak ditemukan!');
-        }
-
-        const isOccupied = currentOrders.some(o => o.table === targetTableNo.trim() && o.status !== 'CLOSED');
-        if (isOccupied) {
-          return alert(`Meja ${targetTableNo} sedang terisi! Pilih meja yang masih kosong.`);
-        }
-
         socket.emit('move-table', { oldTable: oldTableNo, newTable: targetTableNo.trim() });
-        alert(`Berhasil memindahkan pesanan dari Meja ${oldTableNo} ke Meja ${targetTableNo}!`);
       }
     }
   </script>
