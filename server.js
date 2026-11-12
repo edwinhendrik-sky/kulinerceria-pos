@@ -96,6 +96,10 @@ db.serialize(() => {
 
 // ================= API ENDPOINTS =================
 
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
 // Authentication / Login
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
@@ -119,11 +123,19 @@ app.get('/api/menu', (req, res) => {
 // Update Menu Item / Stock
 app.put('/api/menu/:id', (req, res) => {
   const { id } = req.params;
-  const { stock, isAvailable } = req.body;
-  db.run("UPDATE menus SET stock = ?, isAvailable = ? WHERE id = ?", [stock, isAvailable, id], function(err) {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ success: true });
-  });
+  const { stock, isAvailable, price } = req.body;
+  
+  if (price !== undefined) {
+    db.run("UPDATE menus SET price = ? WHERE id = ?", [price, id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    });
+  } else {
+    db.run("UPDATE menus SET stock = ?, isAvailable = ? WHERE id = ?", [stock, isAvailable, id], function(err) {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ success: true });
+    });
+  }
 });
 
 // Add New Menu Item
@@ -131,7 +143,7 @@ app.post('/api/menu', (req, res) => {
   const { name, price, category, stock, image } = req.body;
   const id = 'm_' + Date.now();
   db.run("INSERT INTO menus (id, name, price, category, stock, isAvailable, image) VALUES (?, ?, ?, ?, ?, 1, ?)",
-    [id, name, price, category, stock, image],
+    [id, name, price, category, stock || 50, image || 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80'],
     function(err) {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ success: true, id });
@@ -139,23 +151,12 @@ app.post('/api/menu', (req, res) => {
   );
 });
 
-// Seed Shao Kao Manual Endpoint (Emergency Fix)
-app.get('/api/seed-shaokao', (req, res) => {
-  const shaokaoMenus = [
-    { id: 'sk1', name: 'Sate Daging Sapi Shao Kao', price: 9000, category: 'shaokao', stock: 50, image: 'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=400&q=80' },
-    { id: 'sk2', name: 'Sate Ayam Tabur Jintan', price: 7000, category: 'shaokao', stock: 50, image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&q=80' },
-    { id: 'sk3', name: 'Sate Kulit Ayam Crispy BBQ', price: 6000, category: 'shaokao', stock: 40, image: 'https://images.unsplash.com/photo-1532636875304-0c89119d9b4d?w=400&q=80' },
-    { id: 'sk4', name: 'Sate Enoki Gulung Sapi', price: 12000, category: 'shaokao', stock: 30, image: 'https://images.unsplash.com/photo-1544025162-d76694265947?w=400&q=80' },
-    { id: 'sk5', name: 'Sate Bakso Sapi Bumbu Pedas', price: 6000, category: 'shaokao', stock: 45, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=400&q=80' },
-    { id: 'sk6', name: 'Sate Sosis Beef Cocktail BBQ', price: 7000, category: 'shaokao', stock: 35, image: 'https://images.unsplash.com/photo-1597289124948-688c1a35b782?w=400&q=80' }
-  ];
-
-  const stmt = db.prepare("INSERT OR REPLACE INTO menus (id, name, price, category, stock, isAvailable, image) VALUES (?, ?, ?, ?, ?, 1, ?)");
-  shaokaoMenus.forEach(m => {
-    stmt.run(m.id, m.name, m.price, m.category, m.stock, m.image);
+// Delete Menu Item
+app.delete('/api/menu/:id', (req, res) => {
+  db.run("DELETE FROM menus WHERE id = ?", [req.params.id], function(err) {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
   });
-  stmt.finalize();
-  res.json({ success: true, message: 'Menu Sate Shao Kao Berhasil Ditambahkan!' });
 });
 
 // Member CRM APIs
@@ -180,22 +181,35 @@ app.get('/api/members-summary', (req, res) => {
   });
 });
 
-app.post('/api/voucher/check', (req, res) => {
-  const { code, total } = req.body;
-  db.get("SELECT * FROM vouchers WHERE code = ? AND isActive = 1", [code.toUpperCase()], (err, row) => {
-    if (!row) return res.json({ valid: false, message: 'Kode voucher tidak valid!' });
-    if (total < row.min_purchase) {
-      return res.json({ valid: false, message: `Minimal pembelian Rp ${row.min_purchase.toLocaleString('id-ID')}` });
-    }
-    res.json({ valid: true, discount: row.discount_amount });
-  });
-});
-
 // Report Sales API
-app.get('/api/reports/sales', (req, res) => {
+app.get('/api/reports', (req, res) => {
   db.all("SELECT * FROM sales_reports ORDER BY id DESC", [], (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
-    res.json(rows || []);
+    
+    let totalOmzet = 0;
+    let bestSellers = {};
+    let history = rows.map(r => {
+      let parsedItems = JSON.parse(r.items);
+      totalOmzet += r.total;
+      parsedItems.forEach(i => {
+        bestSellers[i.name] = (bestSellers[i.name] || 0) + 1;
+      });
+      return {
+        id: r.order_id,
+        table: r.table_no,
+        items: parsedItems,
+        total: r.total,
+        method: r.method,
+        closedAt: r.closedAt
+      };
+    });
+
+    res.json({
+      totalOmzet,
+      totalTransactions: rows.length,
+      bestSellers,
+      history
+    });
   });
 });
 
@@ -212,6 +226,8 @@ function broadcastActiveOrders() {
         items: JSON.parse(r.items)
       }));
       io.emit('order-update', parsedOrders);
+      io.emit('initial-orders', parsedOrders);
+      io.emit('order-updated', parsedOrders);
     }
   });
 }
@@ -223,10 +239,10 @@ io.on('connection', (socket) => {
   // 1. Pesanan Baru dari Pelanggan
   socket.on('new-order', (data) => {
     const orderId = 'ORD-' + Date.now().toString().slice(-6);
-    const createdAt = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    const createdAt = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString('id-ID');
 
     db.run(
-      "INSERT INTO orders (id, table_no, customer_name, customer_phone, items, total, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?)",
+      "INSERT INTO orders (id, table_no, customer_name, customer_phone, items, total, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, 'COOKING', ?)",
       [orderId, data.table, data.customerName || 'Pelanggan', data.customerPhone || null, JSON.stringify(data.items), data.total, createdAt],
       (err) => {
         if (!err) {
@@ -236,7 +252,22 @@ io.on('connection', (socket) => {
     );
   });
 
-  // 2. Update Status & Close Bill (Pelunasan Transaksi Kasir)
+  // 2. Tambah Pesanan Manual oleh Kasir
+  socket.on('add-manual-item', ({ orderId, itemName, itemPrice }) => {
+    db.get("SELECT * FROM orders WHERE id = ?", [orderId], (err, row) => {
+      if (row) {
+        let items = JSON.parse(row.items);
+        items.push({ name: itemName, price: itemPrice, category: 'kitchen' });
+        let newTotal = row.total + itemPrice;
+
+        db.run("UPDATE orders SET items = ?, total = ? WHERE id = ?", [JSON.stringify(items), newTotal, orderId], () => {
+          broadcastActiveOrders();
+        });
+      }
+    });
+  });
+
+  // 3. Update Status & Close Bill (Pelunasan Transaksi Kasir)
   socket.on('update-status', ({ orderId, status, method }) => {
     if (status === 'CLOSED') {
       db.get("SELECT * FROM orders WHERE id = ?", [orderId], (err, row) => {
@@ -289,9 +320,9 @@ io.on('connection', (socket) => {
     }
   });
 
-  // 3. Complete Kitchen / Bar Item Order
+  // 4. Complete Kitchen / Bar Item Order
   socket.on('complete-kitchen-order', (orderId) => {
-    db.run("UPDATE orders SET status = 'COOKED' WHERE id = ?", [orderId], () => {
+    db.run("UPDATE orders SET status = 'READY' WHERE id = ?", [orderId], () => {
       broadcastActiveOrders();
     });
   });
