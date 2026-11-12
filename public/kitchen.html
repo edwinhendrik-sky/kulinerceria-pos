@@ -60,15 +60,15 @@
       container.innerHTML = '';
 
       let hasKitchenOrders = false;
+      // Ambil semua pesanan yang belum berstatus CLOSED
       const filteredOrders = activeOrders.filter(o => o.status !== 'CLOSED');
 
       filteredOrders.forEach(order => {
+        // TAMPILKAN SEMUA ITEM KECUALI YANG JELAS-JELAS KATEGORI MINUMAN (BAR)
+        // Ini memastikan sate shao kao atau makanan apapun pasti muncul di dapur
         const kitchenItems = (order.items || []).filter(item => {
           const cat = (item.category || '').toLowerCase();
-          const name = (item.name || '').toLowerCase();
-          const id = (item.id || '').toLowerCase();
-
-          return cat === 'kitchen' || cat === 'shaokao' || name.includes('sate') || name.includes('shao') || id.startsWith('sk');
+          return cat !== 'bar' && cat !== 'minuman';
         });
 
         if (kitchenItems.length > 0) {
@@ -76,7 +76,7 @@
 
           let itemsHTML = '';
           kitchenItems.forEach((item, index) => {
-            const isSate = item.category === 'shaokao' || item.name.toLowerCase().includes('sate');
+            const isSate = (item.category || '').toLowerCase() === 'shaokao' || (item.name || '').toLowerCase().includes('sate');
             itemsHTML += `
               <li class="item-row">
                 <input type="checkbox" id="chk-${order.id}-${index}">
